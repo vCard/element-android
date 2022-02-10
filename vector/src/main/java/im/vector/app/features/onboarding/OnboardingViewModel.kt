@@ -49,7 +49,6 @@ import im.vector.app.features.login.ServerType
 import im.vector.app.features.login.SignMode
 import im.vector.app.features.settings.VectorDataStore
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.matrix.android.sdk.api.MatrixPatterns.getDomain
 import org.matrix.android.sdk.api.auth.AuthenticationService
@@ -899,10 +898,14 @@ class OnboardingViewModel @AssistedInject constructor(
     private fun updateDisplayName(displayName: String) {
         setState { copy(asyncDisplayName = Loading()) }
         viewModelScope.launch {
-            // TODO real upstream display name update
-            delay(2000)
-            displayName.toString()
-            setState { copy(asyncDisplayName = Success(Unit)) }
+            val activeSession = activeSessionHolder.getActiveSession()
+            try {
+                activeSession.setDisplayName(activeSession.myUserId, displayName)
+                setState { copy(asyncDisplayName = Success(Unit)) }
+            } catch (error: Throwable) {
+                setState { copy(asyncDisplayName = Fail(error)) }
+                _viewEvents.post(OnboardingViewEvents.Failure(error))
+            }
             _viewEvents.post(OnboardingViewEvents.OnDisplayNameUpdated)
         }
     }
