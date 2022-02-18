@@ -126,7 +126,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun `given a selected picture when handling save selected profile picture then updates upstream avatar`() = runBlockingTest {
+    fun `given a selected picture when handling save selected profile picture then updates upstream avatar and completes personalization`() = runBlockingTest {
         val initialStateWithPicture = givenPictureSelected(fakeUri.instance, A_PICTURE_FILENAME)
         viewModel = createViewModel(initialStateWithPicture)
         val test = viewModel.test(this)
@@ -164,6 +164,18 @@ class OnboardingViewModelTest {
         test
                 .assertStates(initialState)
                 .assertEvent { it is OnboardingViewEvents.Failure && it.throwable is NullPointerException }
+                .finish()
+    }
+
+    @Test
+    fun `when handling profile picture skipped then completes personalization`() = runBlockingTest {
+        val test = viewModel.test(this)
+
+        viewModel.handle(OnboardingAction.UpdateProfilePictureSkipped)
+
+        test
+                .assertStates(initialState)
+                .assertEvents(OnboardingViewEvents.OnPersonalizationComplete)
                 .finish()
     }
 
