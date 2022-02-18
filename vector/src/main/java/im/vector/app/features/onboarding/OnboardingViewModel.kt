@@ -66,6 +66,7 @@ import org.matrix.android.sdk.api.failure.Failure
 import org.matrix.android.sdk.api.failure.MatrixIdFailure
 import org.matrix.android.sdk.api.session.Session
 import timber.log.Timber
+import java.util.UUID
 import java.util.concurrent.CancellationException
 
 /**
@@ -82,9 +83,9 @@ class OnboardingViewModel @AssistedInject constructor(
         private val homeServerHistoryService: HomeServerHistoryService,
         private val vectorFeatures: VectorFeatures,
         private val analyticsTracker: AnalyticsTracker,
-        private val vectorDataStore: VectorDataStore,
-        private val vectorOverrides: VectorOverrides
-) : VectorViewModel<OnboardingViewState, OnboardingAction, OnboardingViewEvents>(initialState) {
+        private val vectorOverrides: VectorOverrides,
+        private val uriFilenameResolver: UriFilenameResolver
+        ) : VectorViewModel<OnboardingViewState, OnboardingAction, OnboardingViewEvents>(initialState) {
 
     @AssistedFactory
     interface Factory : MavericksAssistedViewModelFactory<OnboardingViewModel, OnboardingViewState> {
@@ -160,7 +161,12 @@ class OnboardingViewModel @AssistedInject constructor(
             is OnboardingAction.PostViewEvent              -> _viewEvents.post(action.viewEvent)
             is OnboardingAction.UpdateDisplayName          -> updateDisplayName(action.displayName)
             OnboardingAction.UpdateDisplayNameSkipped      -> _viewEvents.post(OnboardingViewEvents.OnDisplayNameSkipped)
-            OnboardingAction.UpdateProfilePictureSkipped   -> TODO()
+            OnboardingAction.UpdateProfilePictureSkipped   -> _viewEvents.post(OnboardingViewEvents.OnPersonalizationComplete)
+            is OnboardingAction.ProfilePictureSelected     -> setState {
+                copy(personalizationState = personalizationState.copy(selectedPictureUri = action.uri))
+            }
+            OnboardingAction.SaveSelectedProfilePicture    -> updateProfilePicture()
+
         }.exhaustive
     }
 
@@ -903,13 +909,55 @@ class OnboardingViewModel @AssistedInject constructor(
             val activeSession = activeSessionHolder.getActiveSession()
             try {
                 activeSession.setDisplayName(activeSession.myUserId, displayName)
-                setState { copy(asyncDisplayName = Success(Unit)) }
+                setState {
+                    copy(
+                            asyncDisplayName = Success(Unit),
+                            personalizationState = personalizationState.copy(displayName = displayName)
+                    )
+                }
                 _viewEvents.post(OnboardingViewEvents.OnDisplayNameUpdated)
             } catch (error: Throwable) {
                 setState { copy(asyncDisplayName = Fail(error)) }
                 _viewEvents.post(OnboardingViewEvents.Failure(error))
             }
         }
+    }
+
+    private fun updateProfilePicture() {
+        withState { state ->
+
+            when (val pictureUri = state.personalizationState.selectedPictureUri) {
+                null -> {
+                    _viewEvents.post(OnboardingViewEvents.Failure(NullPointerException("picture uri is missing from state")))
+                }
+                else -> {
+                    setState { copy(asyncProfilePicture = Loading()) }
+                    viewModelScope.launch {
+                        val activeSession = activeSessionHolder.getActiveSession()
+                        try {
+                            activeSession.updateAvatar(
+                                    activeSession.myUserId,
+                                    pictureUri,
+                                    uriFilenameResolver.getFilenameFromUri(pictureUri) ?: UUID.randomUUID().toString()
+                            )
+                            setState {
+                                copy(
+                                        asyncProfilePicture = Success(Unit),
+                                )
+                            }
+                            onProfilePictureSaved()
+                        } catch (error: Throwable) {
+                            setState { copy(asyncProfilePicture = Fail(error)) }
+                            _viewEvents.post(OnboardingViewEvents.Failure(error))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun onProfilePictureSaved() {
+        _viewEvents.post(OnboardingViewEvents.OnPersonalizationComplete)
     }
 }
 
