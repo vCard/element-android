@@ -163,7 +163,6 @@ class OnboardingViewModel @AssistedInject constructor(
             OnboardingAction.UpdateProfilePictureSkipped   -> _viewEvents.post(OnboardingViewEvents.OnPersonalizationComplete)
             is OnboardingAction.ProfilePictureSelected     -> handleProfilePictureSelected(action)
             OnboardingAction.SaveSelectedProfilePicture    -> updateProfilePicture()
-
         }.exhaustive
     }
 
