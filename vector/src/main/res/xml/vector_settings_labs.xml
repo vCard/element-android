@@ -68,4 +68,10 @@
         android:key="SETTINGS_LABS_RENDER_LOCATIONS_IN_TIMELINE"
         android:title="@string/labs_render_locations_in_timeline" />
 
+    <im.vector.app.core.preference.VectorSwitchPreference
+        android:defaultValue="false"
+        android:key="SETTINGS_LABS_IS_LIVE_SENDER_INFO"
+        android:summary="@string/labs_show_latest_profile_description"
+        android:title="@string/labs_show_latest_profile" />
+
 </androidx.preference.PreferenceScreen>
