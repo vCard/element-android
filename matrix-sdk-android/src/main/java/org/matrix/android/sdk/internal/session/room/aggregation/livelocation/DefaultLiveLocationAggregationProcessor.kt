@@ -26,7 +26,9 @@ import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBe
 import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 import org.matrix.android.sdk.internal.database.mapper.ContentMapper
 import org.matrix.android.sdk.internal.database.model.CurrentStateEventEntity
+import org.matrix.android.sdk.internal.database.model.CurrentStateEventEntityFields
 import org.matrix.android.sdk.internal.database.query.getOrNull
+import org.matrix.android.sdk.internal.database.query.whereStateKey
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -40,12 +42,17 @@ internal class DefaultLiveLocationAggregationProcessor @Inject constructor() : L
             return
         }
 
+        val targetEventId = content.relatesTo?.eventId ?: return
+
         // A beacon info state event has to be sent before sending location
-        // TODO handle missing check of m_relatesTo field
         var beaconInfoEntity: CurrentStateEventEntity? = null
         val eventTypesIterator = EventType.STATE_ROOM_BEACON_INFO.iterator()
         while (beaconInfoEntity == null && eventTypesIterator.hasNext()) {
-            beaconInfoEntity = CurrentStateEventEntity.getOrNull(realm, roomId, locationSenderId, eventTypesIterator.next())
+            beaconInfoEntity = CurrentStateEventEntity
+                    .whereStateKey(realm, roomId, locationSenderId, eventTypesIterator.next())
+                    .and()
+                    .equalTo(CurrentStateEventEntityFields.EVENT_ID, targetEventId)
+                    .findFirst()
         }
 
         if (beaconInfoEntity == null) {
