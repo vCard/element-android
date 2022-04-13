@@ -27,12 +27,31 @@ import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocation
 import org.matrix.android.sdk.internal.database.mapper.ContentMapper
 import org.matrix.android.sdk.internal.database.model.CurrentStateEventEntity
 import org.matrix.android.sdk.internal.database.model.CurrentStateEventEntityFields
-import org.matrix.android.sdk.internal.database.query.getOrNull
+import org.matrix.android.sdk.internal.database.query.getOrCreate
 import org.matrix.android.sdk.internal.database.query.whereStateKey
 import timber.log.Timber
 import javax.inject.Inject
 
 internal class DefaultLiveLocationAggregationProcessor @Inject constructor() : LiveLocationAggregationProcessor {
+
+    override fun handleLiveLocationState(realm: Realm, event: Event, content: LiveLocationBeaconContent, roomId: String, isLocalEcho: Boolean) {
+        // TODO mutualize common processes?
+        val locationSenderId = event.senderId ?: return
+        val eventId = event.eventId ?: return
+
+        // We shouldn't process local echos
+        if (isLocalEcho) {
+            return
+        }
+
+        val beaconInfoEntity = CurrentStateEventEntity
+                .getOrCreate(realm = realm, roomId = roomId, stateKey = locationSenderId, type = "org.matrix.msc3672.beacon_info")
+        beaconInfoEntity.eventId = eventId
+
+        // TODO update content
+        //val beaconInfoContent = ContentMapper.map(beaconInfoEntity.root?.content)?.toModel<LiveLocationBeaconContent>(catchError = true)
+        //beaconInfoContent.
+    }
 
     override fun handleLiveLocation(realm: Realm, event: Event, content: MessageLiveLocationContent, roomId: String, isLocalEcho: Boolean) {
         val locationSenderId = event.senderId ?: return
@@ -49,7 +68,7 @@ internal class DefaultLiveLocationAggregationProcessor @Inject constructor() : L
         val eventTypesIterator = EventType.STATE_ROOM_BEACON_INFO.iterator()
         while (beaconInfoEntity == null && eventTypesIterator.hasNext()) {
             beaconInfoEntity = CurrentStateEventEntity
-                    .whereStateKey(realm, roomId, locationSenderId, eventTypesIterator.next())
+                    .whereStateKey(realm = realm, roomId = roomId, stateKey = locationSenderId, type = eventTypesIterator.next())
                     .and()
                     .equalTo(CurrentStateEventEntityFields.EVENT_ID, targetEventId)
                     .findFirst()

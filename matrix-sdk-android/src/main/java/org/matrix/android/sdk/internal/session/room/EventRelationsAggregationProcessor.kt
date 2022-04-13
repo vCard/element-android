@@ -32,6 +32,7 @@ import org.matrix.android.sdk.api.session.room.model.PowerLevelsContent
 import org.matrix.android.sdk.api.session.room.model.ReferencesAggregatedContent
 import org.matrix.android.sdk.api.session.room.model.VoteInfo
 import org.matrix.android.sdk.api.session.room.model.VoteSummary
+import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageEndPollContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
@@ -91,7 +92,7 @@ internal class EventRelationsAggregationProcessor @Inject constructor(
             // EventType.KEY_VERIFICATION_READY,
             EventType.KEY_VERIFICATION_KEY,
             EventType.ENCRYPTED
-    ) + EventType.POLL_START + EventType.POLL_RESPONSE + EventType.POLL_END + EventType.BEACON_LOCATION_DATA
+    ) + EventType.POLL_START + EventType.POLL_RESPONSE + EventType.POLL_END + EventType.STATE_ROOM_BEACON_INFO + EventType.BEACON_LOCATION_DATA
 
     override fun shouldProcess(eventId: String, eventType: String, insertType: EventInsertType): Boolean {
         return allowedTypes.contains(eventType)
@@ -188,6 +189,11 @@ internal class EventRelationsAggregationProcessor @Inject constructor(
                                     handleEndPoll(realm, event, it, roomId, isLocalEcho)
                                 }
                             }
+                            in EventType.STATE_ROOM_BEACON_INFO -> {
+                                event.content.toModel<LiveLocationBeaconContent>(catchError = true)?.let {
+                                    liveLocationAggregationProcessor.handleLiveLocationState(realm, event, it, roomId, isLocalEcho)
+                                }
+                            }
                             in EventType.BEACON_LOCATION_DATA -> {
                                 event.content.toModel<MessageLiveLocationContent>(catchError = true)?.let {
                                     liveLocationAggregationProcessor.handleLiveLocation(realm, event, it, roomId, isLocalEcho)
@@ -249,6 +255,11 @@ internal class EventRelationsAggregationProcessor @Inject constructor(
                 in EventType.POLL_END             -> {
                     event.content.toModel<MessageEndPollContent>(catchError = true)?.let {
                         handleEndPoll(realm, event, it, roomId, isLocalEcho)
+                    }
+                }
+                in EventType.STATE_ROOM_BEACON_INFO -> {
+                    event.content.toModel<LiveLocationBeaconContent>(catchError = true)?.let {
+                        liveLocationAggregationProcessor.handleLiveLocationState(realm, event, it, roomId, isLocalEcho)
                     }
                 }
                 in EventType.BEACON_LOCATION_DATA -> {
