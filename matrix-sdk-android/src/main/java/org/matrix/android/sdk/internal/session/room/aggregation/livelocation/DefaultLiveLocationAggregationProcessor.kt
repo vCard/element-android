@@ -35,24 +35,6 @@ import javax.inject.Inject
 
 internal class DefaultLiveLocationAggregationProcessor @Inject constructor() : LiveLocationAggregationProcessor {
 
-    override fun handleLiveLocationState(realm: Realm, event: Event, content: LiveLocationBeaconContent, roomId: String, isLocalEcho: Boolean) {
-        val locationSenderId = event.senderId ?: return
-        val eventId = event.eventId ?: return
-
-        // We shouldn't process local echos
-        if (isLocalEcho) {
-            return
-        }
-
-        val beaconInfoEntity = CurrentStateEventEntity
-                .getOrCreate(realm = realm, roomId = roomId, stateKey = locationSenderId, type = STATE_ROOM_BEACON_INFO_UNSTABLE)
-        beaconInfoEntity.eventId = eventId
-
-        // TODO update content
-        //val beaconInfoContent = ContentMapper.map(beaconInfoEntity.root?.content)?.toModel<LiveLocationBeaconContent>(catchError = true)
-        //beaconInfoContent.
-    }
-
     override fun handleLiveLocation(realm: Realm, event: Event, content: MessageLiveLocationContent, roomId: String, isLocalEcho: Boolean) {
         val locationSenderId = event.senderId ?: return
 

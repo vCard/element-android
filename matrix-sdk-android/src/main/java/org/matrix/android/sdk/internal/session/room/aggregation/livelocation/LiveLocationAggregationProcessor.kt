@@ -22,13 +22,6 @@ import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBe
 import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 
 interface LiveLocationAggregationProcessor {
-    // TODO check with team if it is the right place to process state event
-    fun handleLiveLocationState(realm: Realm,
-                                event: Event,
-                                content: LiveLocationBeaconContent,
-                                roomId: String,
-                                isLocalEcho: Boolean)
-
     fun handleLiveLocation(realm: Realm,
                            event: Event,
                            content: MessageLiveLocationContent,
