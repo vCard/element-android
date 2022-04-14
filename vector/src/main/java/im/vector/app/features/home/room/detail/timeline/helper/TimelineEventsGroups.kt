@@ -21,6 +21,7 @@ import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.session.events.model.EventType
 import org.matrix.android.sdk.api.session.events.model.toModel
 import org.matrix.android.sdk.api.session.room.model.call.CallInviteContent
+import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
 import org.matrix.android.sdk.api.session.widgets.model.WidgetContent
 import org.threeten.bp.Duration
@@ -54,12 +55,12 @@ class TimelineEventsGroups {
     private fun TimelineEvent.getGroupIdOrNull(): String? {
         val type = root.getClearType()
         val content = root.getClearContent()
-        return if (EventType.isCallEvent(type)) {
-            (content?.get("call_id") as? String)
-        } else if (type == EventType.STATE_ROOM_WIDGET || type == EventType.STATE_ROOM_WIDGET_LEGACY) {
-            root.stateKey
-        } else {
-            null
+        return when {
+            EventType.isCallEvent(type)                                                       -> (content?.get("call_id") as? String)
+            type in EventType.STATE_ROOM_BEACON_INFO                                          -> root.eventId
+            type in EventType.BEACON_LOCATION_DATA                                            -> content?.toModel<MessageLiveLocationContent>()?.relatesTo?.eventId
+            type == EventType.STATE_ROOM_WIDGET || type == EventType.STATE_ROOM_WIDGET_LEGACY -> root.stateKey
+            else                                                                              -> null
         }
     }
 
