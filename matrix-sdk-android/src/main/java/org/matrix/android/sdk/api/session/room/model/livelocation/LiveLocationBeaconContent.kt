@@ -19,6 +19,8 @@ package org.matrix.android.sdk.api.session.room.model.livelocation
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import org.matrix.android.sdk.api.session.events.model.Content
+import org.matrix.android.sdk.api.session.events.model.EventType.STATE_ROOM_BEACON_INFO_STABLE
+import org.matrix.android.sdk.api.session.events.model.EventType.STATE_ROOM_BEACON_INFO_UNSTABLE
 import org.matrix.android.sdk.api.session.room.model.message.LocationAsset
 import org.matrix.android.sdk.api.session.room.model.message.LocationAssetType
 import org.matrix.android.sdk.api.session.room.model.message.MessageContent
@@ -41,8 +43,8 @@ data class LiveLocationBeaconContent(
         /**
          * Indicates user's intent to share ephemeral location.
          */
-        @Json(name = "org.matrix.msc3672.beacon_info") val unstableBeaconInfo: BeaconInfo? = null,
-        @Json(name = "m.beacon_info") val beaconInfo: BeaconInfo? = null,
+        @Json(name = STATE_ROOM_BEACON_INFO_UNSTABLE) val unstableBeaconInfo: BeaconInfo? = null,
+        @Json(name = STATE_ROOM_BEACON_INFO_STABLE) val beaconInfo: BeaconInfo? = null,
         /**
          * Beacon creation timestamp.
          */

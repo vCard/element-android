@@ -20,6 +20,7 @@ import io.realm.Realm
 import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.session.events.model.Event
 import org.matrix.android.sdk.api.session.events.model.EventType
+import org.matrix.android.sdk.api.session.events.model.EventType.STATE_ROOM_BEACON_INFO_UNSTABLE
 import org.matrix.android.sdk.api.session.events.model.toContent
 import org.matrix.android.sdk.api.session.events.model.toModel
 import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
@@ -35,7 +36,6 @@ import javax.inject.Inject
 internal class DefaultLiveLocationAggregationProcessor @Inject constructor() : LiveLocationAggregationProcessor {
 
     override fun handleLiveLocationState(realm: Realm, event: Event, content: LiveLocationBeaconContent, roomId: String, isLocalEcho: Boolean) {
-        // TODO mutualize common processes?
         val locationSenderId = event.senderId ?: return
         val eventId = event.eventId ?: return
 
@@ -45,7 +45,7 @@ internal class DefaultLiveLocationAggregationProcessor @Inject constructor() : L
         }
 
         val beaconInfoEntity = CurrentStateEventEntity
-                .getOrCreate(realm = realm, roomId = roomId, stateKey = locationSenderId, type = "org.matrix.msc3672.beacon_info")
+                .getOrCreate(realm = realm, roomId = roomId, stateKey = locationSenderId, type = STATE_ROOM_BEACON_INFO_UNSTABLE)
         beaconInfoEntity.eventId = eventId
 
         // TODO update content

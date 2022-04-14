@@ -108,7 +108,7 @@ class LocationSharingService : VectorService(), LocationTracker.Callback {
         session
                 .getRoom(roomArgs.roomId)
                 ?.sendStateEvent(
-                        eventType = EventType.STATE_ROOM_BEACON_INFO.first(),
+                        eventType = EventType.STATE_ROOM_BEACON_INFO_UNSTABLE,
                         stateKey = stateKey,
                         body = beaconContent
                 )

@@ -264,7 +264,7 @@ internal class LocalEchoEventFactory @Inject constructor(
                 originServerTs = dummyOriginServerTs(),
                 senderId = userId,
                 eventId = localId,
-                type = EventType.BEACON_LOCATION_DATA.first(),
+                type = EventType.BEACON_LOCATION_DATA_UNSTABLE,
                 content = content.toContent(),
                 unsignedData = UnsignedData(age = null, transactionId = localId))
     }
