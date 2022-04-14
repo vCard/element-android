@@ -21,6 +21,9 @@ import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.session.events.model.EventType
 import org.matrix.android.sdk.api.session.events.model.toModel
 import org.matrix.android.sdk.api.session.room.model.call.CallInviteContent
+import org.matrix.android.sdk.api.session.room.model.livelocation.BeaconInfo
+import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
+import org.matrix.android.sdk.api.session.room.model.message.LocationInfo
 import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
 import org.matrix.android.sdk.api.session.widgets.model.WidgetContent
@@ -127,5 +130,48 @@ class CallSignalingEventsGroup(private val group: TimelineEventsGroup) {
 
     private fun getReject(): TimelineEvent? {
         return group.events.firstOrNull { it.root.getClearType() == EventType.CALL_REJECT }
+    }
+}
+
+class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
+
+    sealed class LiveLocationSharingStatus {
+        object Loading : LiveLocationSharingStatus()
+        data class Lived(val locationInfo: LocationInfo) : LiveLocationSharingStatus()
+        object Stopped : LiveLocationSharingStatus()
+        object Unkwown : LiveLocationSharingStatus()
+    }
+
+    fun getCurrentStatus(): LiveLocationSharingStatus {
+
+        val lastLocationInfo = getLastLocationInfo()
+        val beaconInfo = getBeaconInfo()
+        return when {
+            lastLocationInfo == null && beaconInfo?.isLive.orFalse() -> LiveLocationSharingStatus.Loading
+            // TODO how to handle beacon timeout?
+            beaconInfo?.isLive.orFalse().not()                       -> LiveLocationSharingStatus.Stopped
+            lastLocationInfo != null                                 -> LiveLocationSharingStatus.Lived(lastLocationInfo)
+            else                                                     -> LiveLocationSharingStatus.Unkwown
+        }
+    }
+
+    private fun getBeaconInfo(): BeaconInfo? {
+        val timelineEvent = group.events
+                .firstOrNull { it.root.getClearType() in EventType.STATE_ROOM_BEACON_INFO }
+        return timelineEvent
+                ?.root
+                ?.getClearContent()
+                .toModel<LiveLocationBeaconContent>()
+                ?.getBestBeaconInfo()
+    }
+
+    private fun getLastLocationInfo(): LocationInfo? {
+        val timelineEvent = group.events
+                .firstOrNull { it.root.getClearType() in EventType.BEACON_LOCATION_DATA }
+        return timelineEvent
+                ?.root
+                ?.getClearContent()
+                .toModel<MessageLiveLocationContent>()
+                ?.getBestLocationInfo()
     }
 }
