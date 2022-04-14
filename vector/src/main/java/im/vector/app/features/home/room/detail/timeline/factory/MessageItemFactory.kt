@@ -146,7 +146,6 @@ class MessageItemFactory @Inject constructor(
     private val locationPinProvider: LocationPinProvider,
     private val vectorPreferences: VectorPreferences,
     private val urlMapProvider: UrlMapProvider,
-    private val liveLocationMessageItemFactory: LiveLocationMessageItemFactory,
 ) {
 
     // TODO inject this properly?
@@ -214,7 +213,6 @@ class MessageItemFactory @Inject constructor(
                     buildMessageTextItem(messageContent.body, false, informationData, highlight, callback, attributes)
                 }
             }
-            is LiveLocationBeaconContent -> liveLocationMessageItemFactory.create(messageContent, highlight, attributes)
             else -> buildNotHandledMessageItem(messageContent, informationData, highlight, callback, attributes)
         }
         return messageItem?.apply {

@@ -36,6 +36,7 @@ class TimelineItemFactory @Inject constructor(
         private val widgetItemFactory: WidgetItemFactory,
         private val verificationConclusionItemFactory: VerificationItemFactory,
         private val callItemFactory: CallItemFactory,
+        private val liveLocationItemFactory: LiveLocationItemFactory,
         private val decryptionFailureTracker: DecryptionFailureTracker,
         private val timelineEventVisibilityHelper: TimelineEventVisibilityHelper,
 ) {
@@ -85,7 +86,7 @@ class TimelineItemFactory @Inject constructor(
                     EventType.STATE_ROOM_ENCRYPTION     -> encryptionItemFactory.create(params)
                     // State room create
                     EventType.STATE_ROOM_CREATE         -> roomCreateItemFactory.create(params)
-                    in EventType.STATE_ROOM_BEACON_INFO -> messageItemFactory.create(params)
+                    in EventType.STATE_ROOM_BEACON_INFO -> liveLocationItemFactory.create(params)
                     // Unhandled state event types
                     else                                -> {
                         // Should only happen when shouldShowHiddenEvents() settings is ON
