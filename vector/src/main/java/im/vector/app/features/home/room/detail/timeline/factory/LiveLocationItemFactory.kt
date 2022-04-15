@@ -61,6 +61,7 @@ class LiveLocationItemFactory @Inject constructor(
             is LiveLocationEventsGroup.LiveLocationSharingStatus.Running -> buildRunningItem(params.isHighlighted, attributes, currentStatus.locationInfo)
             LiveLocationEventsGroup.LiveLocationSharingStatus.Unkwown    -> null
         }
+        item?.layout(attributes.informationData.messageLayout.layoutRes)
 
         return if (item == null && showHiddenEvents) {
             // Fallback to notice item for showing hidden events

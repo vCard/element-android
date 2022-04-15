@@ -29,7 +29,9 @@ import org.matrix.android.sdk.api.session.events.model.isSticker
 import org.matrix.android.sdk.api.session.events.model.toModel
 import org.matrix.android.sdk.api.session.room.model.EventAnnotationsSummary
 import org.matrix.android.sdk.api.session.room.model.ReadReceipt
+import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageContent
+import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 import org.matrix.android.sdk.api.session.room.model.message.MessagePollContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageStickerContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageTextContent
@@ -136,9 +138,11 @@ fun TimelineEvent.getEditedEventId(): String? {
  */
 fun TimelineEvent.getLastMessageContent(): MessageContent? {
     return when (root.getClearType()) {
-        EventType.STICKER       -> root.getClearContent().toModel<MessageStickerContent>()
-        in EventType.POLL_START -> (annotations?.editSummary?.latestContent ?: root.getClearContent()).toModel<MessagePollContent>()
-        else                    -> (annotations?.editSummary?.latestContent ?: root.getClearContent()).toModel()
+        EventType.STICKER                   -> root.getClearContent().toModel<MessageStickerContent>()
+        in EventType.POLL_START             -> (annotations?.editSummary?.latestContent ?: root.getClearContent()).toModel<MessagePollContent>()
+        in EventType.STATE_ROOM_BEACON_INFO -> (annotations?.editSummary?.latestContent ?: root.getClearContent()).toModel<LiveLocationBeaconContent>()
+        in EventType.BEACON_LOCATION_DATA   -> (annotations?.editSummary?.latestContent ?: root.getClearContent()).toModel<MessageLiveLocationContent>()
+        else                                -> (annotations?.editSummary?.latestContent ?: root.getClearContent()).toModel()
     }
 }
 

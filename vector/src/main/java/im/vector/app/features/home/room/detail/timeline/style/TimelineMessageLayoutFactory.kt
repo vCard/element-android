@@ -145,15 +145,15 @@ class TimelineMessageLayoutFactory @Inject constructor(private val session: Sess
 
     private fun MessageContent?.timestampInsideMessage(): Boolean {
         if (this == null) return false
-        if (msgType == MessageType.MSGTYPE_LOCATION) return vectorPreferences.labsRenderLocationsInTimeline()
+        if (msgType == MessageType.MSGTYPE_LOCATION || msgType == MessageType.MSGTYPE_LIVE_LOCATION) return vectorPreferences.labsRenderLocationsInTimeline()
         return this.msgType in MSG_TYPES_WITH_TIMESTAMP_INSIDE_MESSAGE
     }
 
     private fun MessageContent?.shouldAddMessageOverlay(): Boolean {
         return when {
             this == null || msgType == MessageType.MSGTYPE_LIVE_LOCATION_STATE -> false
-            msgType == MessageType.MSGTYPE_LOCATION                            -> vectorPreferences.labsRenderLocationsInTimeline()
-            else                                                               -> msgType in MSG_TYPES_WITH_TIMESTAMP_INSIDE_MESSAGE
+            msgType == MessageType.MSGTYPE_LOCATION                 -> vectorPreferences.labsRenderLocationsInTimeline()
+            else                                                    -> msgType in MSG_TYPES_WITH_TIMESTAMP_INSIDE_MESSAGE
         }
     }
 
