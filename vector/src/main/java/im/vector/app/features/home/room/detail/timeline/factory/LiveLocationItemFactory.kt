@@ -88,6 +88,7 @@ class LiveLocationItemFactory @Inject constructor(
                 .leftGuideline(avatarSizeProvider.leftGuideline)
     }
 
+    // TODO handle Stopped Item in a next PR
     private fun buildStoppedItem() = null
 
     private fun buildRunningItem(
