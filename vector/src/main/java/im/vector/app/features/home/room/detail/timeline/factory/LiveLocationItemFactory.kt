@@ -25,11 +25,19 @@ import im.vector.app.features.home.room.detail.timeline.helper.MessageInformatio
 import im.vector.app.features.home.room.detail.timeline.helper.MessageItemAttributesFactory
 import im.vector.app.features.home.room.detail.timeline.helper.TimelineMediaSizeProvider
 import im.vector.app.features.home.room.detail.timeline.item.AbsMessageItem
+import im.vector.app.features.home.room.detail.timeline.item.MessageLiveLocationItem
+import im.vector.app.features.home.room.detail.timeline.item.MessageLiveLocationItem_
 import im.vector.app.features.home.room.detail.timeline.item.MessageLiveLocationStartItem
 import im.vector.app.features.home.room.detail.timeline.item.MessageLiveLocationStartItem_
+import im.vector.app.features.location.INITIAL_MAP_ZOOM_IN_TIMELINE
+import im.vector.app.features.location.UrlMapProvider
+import im.vector.app.features.location.toLocationData
+import org.matrix.android.sdk.api.session.Session
+import org.matrix.android.sdk.api.session.room.model.message.LocationInfo
 import javax.inject.Inject
 
 class LiveLocationItemFactory @Inject constructor(
+        private val session: Session,
         private val userPreferencesProvider: UserPreferencesProvider,
         private val messageInformationDataFactory: MessageInformationDataFactory,
         private val messageItemAttributesFactory: MessageItemAttributesFactory,
@@ -37,6 +45,7 @@ class LiveLocationItemFactory @Inject constructor(
         private val dimensionConverter: DimensionConverter,
         private val timelineMediaSizeProvider: TimelineMediaSizeProvider,
         private val avatarSizeProvider: AvatarSizeProvider,
+        private val urlMapProvider: UrlMapProvider,
 ) {
 
     fun create(params: TimelineItemFactoryParams): VectorEpoxyModel<*>? {
@@ -46,11 +55,11 @@ class LiveLocationItemFactory @Inject constructor(
         val liveLocationEventGroup = params.eventsGroup?.let { LiveLocationEventsGroup(it) } ?: return null
         val attributes = buildMessageAttributes(params)
 
-        val item = when (liveLocationEventGroup.getCurrentStatus()) {
-            LiveLocationEventsGroup.LiveLocationSharingStatus.Loading  -> buildLoadingItem(highlight = params.isHighlighted, attributes = attributes)
-            LiveLocationEventsGroup.LiveLocationSharingStatus.Stopped  -> buildStoppedItem()
-            is LiveLocationEventsGroup.LiveLocationSharingStatus.Lived -> buildLivedItem()
-            LiveLocationEventsGroup.LiveLocationSharingStatus.Unkwown  -> null
+        val item = when (val currentStatus = liveLocationEventGroup.getCurrentStatus()) {
+            LiveLocationEventsGroup.LiveLocationSharingStatus.Loading    -> buildLoadingItem(params.isHighlighted, attributes)
+            LiveLocationEventsGroup.LiveLocationSharingStatus.Stopped    -> buildStoppedItem()
+            is LiveLocationEventsGroup.LiveLocationSharingStatus.Running -> buildRunningItem(params.isHighlighted, attributes, currentStatus.locationInfo)
+            LiveLocationEventsGroup.LiveLocationSharingStatus.Unkwown    -> null
         }
 
         return if (item == null && showHiddenEvents) {
@@ -80,5 +89,26 @@ class LiveLocationItemFactory @Inject constructor(
 
     private fun buildStoppedItem() = null
 
-    private fun buildLivedItem() = null
+    private fun buildRunningItem(
+            highlight: Boolean,
+            attributes: AbsMessageItem.Attributes,
+            locationInfo: LocationInfo,
+    ): MessageLiveLocationItem {
+        val width = timelineMediaSizeProvider.getMaxSize().first
+        val height = dimensionConverter.dpToPx(MessageItemFactory.MESSAGE_LOCATION_ITEM_HEIGHT_IN_DP)
+
+        val locationUrl = locationInfo.toLocationData()?.let {
+            urlMapProvider.buildStaticMapUrl(it, INITIAL_MAP_ZOOM_IN_TIMELINE, width, height)
+        }
+
+        return MessageLiveLocationItem_()
+                .attributes(attributes)
+                .locationUrl(locationUrl)
+                .mapWidth(width)
+                .mapHeight(height)
+                .locationUserId(attributes.informationData.senderId)
+                .highlighted(highlight)
+                .leftGuideline(avatarSizeProvider.leftGuideline)
+                .currentUserId(session.myUserId)
+    }
 }

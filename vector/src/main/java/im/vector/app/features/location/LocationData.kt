@@ -19,6 +19,7 @@ package im.vector.app.features.location
 import android.os.Parcelable
 import androidx.annotation.VisibleForTesting
 import kotlinx.parcelize.Parcelize
+import org.matrix.android.sdk.api.session.room.model.message.LocationInfo
 import org.matrix.android.sdk.api.session.room.model.message.MessageLocationContent
 
 @Parcelize
@@ -29,12 +30,21 @@ data class LocationData(
 ) : Parcelable
 
 /**
- * Creates location data from a LocationContent
+ * Creates location data from a MessageLocationContent
  * "geo:40.05,29.24;30" -> LocationData(40.05, 29.24, 30)
  * @return location data or null if geo uri is not valid
  */
 fun MessageLocationContent.toLocationData(): LocationData? {
     return parseGeo(getBestGeoUri())
+}
+
+/**
+ * Creates location data from a LocationInfo
+ * "geo:40.05,29.24;30" -> LocationData(40.05, 29.24, 30)
+ * @return location data or null if geo uri is not valid
+ */
+fun LocationInfo.toLocationData(): LocationData? {
+    return geoUri?.let { parseGeo(it) }
 }
 
 @VisibleForTesting

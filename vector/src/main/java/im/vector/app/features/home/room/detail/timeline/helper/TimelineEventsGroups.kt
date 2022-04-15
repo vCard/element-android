@@ -140,7 +140,7 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
 
     sealed class LiveLocationSharingStatus {
         object Loading : LiveLocationSharingStatus()
-        data class Lived(val locationInfo: LocationInfo) : LiveLocationSharingStatus()
+        data class Running(val locationInfo: LocationInfo) : LiveLocationSharingStatus()
         object Stopped : LiveLocationSharingStatus()
         object Unkwown : LiveLocationSharingStatus()
     }
@@ -157,7 +157,7 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
             beaconContent == null                                                                                   -> LiveLocationSharingStatus.Unkwown
             lastLocationContent == null && isBeaconLive && isBeaconTimedOutComparedToLocalDate(beaconContent).not() -> LiveLocationSharingStatus.Loading
             isBeaconLive.not() || isBeaconTimedOut(beaconContent, lastLocationContent)                              -> LiveLocationSharingStatus.Stopped
-            lastLocationInfo != null                                                                                -> LiveLocationSharingStatus.Lived(lastLocationInfo)
+            lastLocationInfo != null                                                                                -> LiveLocationSharingStatus.Running(lastLocationInfo)
             else                                                                                                    -> LiveLocationSharingStatus.Unkwown
         }
     }
