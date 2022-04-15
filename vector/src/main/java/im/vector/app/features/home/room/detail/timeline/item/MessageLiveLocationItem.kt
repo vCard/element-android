@@ -38,12 +38,15 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
     }
 
     private fun bindLocationLiveBanner(holder: Holder) {
-        // TODO add check on device id to confirm that is the one that sent the beacon
+        // TODO in a future PR add check on device id to confirm that is the one that sent the beacon
         val isEmitter = currentUserId != null && currentUserId == locationUserId
         val messageLayout = attributes.informationData.messageLayout
         val viewState = buildViewState(holder, messageLayout, isEmitter)
         holder.locationLiveMessageBanner.isVisible = true
         holder.locationLiveMessageBanner.render(viewState)
+        holder.locationLiveMessageBanner.stopButton.setOnClickListener {
+            // TODO call stop live location
+        }
         // TODO adjust Copyright map placement if needed
     }
 
