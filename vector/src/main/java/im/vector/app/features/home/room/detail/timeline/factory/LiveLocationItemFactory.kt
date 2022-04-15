@@ -21,6 +21,7 @@ import im.vector.app.core.resources.UserPreferencesProvider
 import im.vector.app.core.utils.DimensionConverter
 import im.vector.app.features.home.room.detail.timeline.helper.AvatarSizeProvider
 import im.vector.app.features.home.room.detail.timeline.helper.LiveLocationEventsGroup
+import im.vector.app.features.home.room.detail.timeline.helper.LocationPinProvider
 import im.vector.app.features.home.room.detail.timeline.helper.MessageInformationDataFactory
 import im.vector.app.features.home.room.detail.timeline.helper.MessageItemAttributesFactory
 import im.vector.app.features.home.room.detail.timeline.helper.TimelineMediaSizeProvider
@@ -46,6 +47,7 @@ class LiveLocationItemFactory @Inject constructor(
         private val timelineMediaSizeProvider: TimelineMediaSizeProvider,
         private val avatarSizeProvider: AvatarSizeProvider,
         private val urlMapProvider: UrlMapProvider,
+        private val locationPinProvider: LocationPinProvider
 ) {
 
     fun create(params: TimelineItemFactoryParams): VectorEpoxyModel<*>? {
@@ -109,6 +111,7 @@ class LiveLocationItemFactory @Inject constructor(
                 .mapWidth(width)
                 .mapHeight(height)
                 .locationUserId(attributes.informationData.senderId)
+                .locationPinProvider(locationPinProvider)
                 .highlighted(highlight)
                 .leftGuideline(avatarSizeProvider.leftGuideline)
                 .currentUserId(session.myUserId)
