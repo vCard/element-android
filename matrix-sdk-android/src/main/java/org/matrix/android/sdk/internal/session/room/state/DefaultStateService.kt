@@ -33,7 +33,6 @@ import org.matrix.android.sdk.api.session.room.model.RoomHistoryVisibility
 import org.matrix.android.sdk.api.session.room.model.RoomJoinRules
 import org.matrix.android.sdk.api.session.room.model.RoomJoinRulesAllowEntry
 import org.matrix.android.sdk.api.session.room.model.RoomJoinRulesContent
-import org.matrix.android.sdk.api.session.room.model.livelocation.BeaconInfo
 import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.state.StateService
 import org.matrix.android.sdk.api.util.JsonDict
@@ -194,14 +193,10 @@ internal class DefaultStateService @AssistedInject constructor(@Assisted private
     override suspend fun stopLiveLocation(userId: String) {
         getLiveLocationBeaconInfo(userId, true)?.let { beaconInfoStateEvent ->
             beaconInfoStateEvent.getClearContent()?.toModel<LiveLocationBeaconContent>()?.let { content ->
-                val beaconContent = LiveLocationBeaconContent(
-                        unstableBeaconInfo = BeaconInfo(
-                                description = content.getBestBeaconInfo()?.description,
-                                timeout = content.getBestBeaconInfo()?.timeout,
-                                isLive = false,
-                        ),
-                        unstableTimestampAsMilliseconds = System.currentTimeMillis()
-                ).toContent()
+                val updatedBeaconInfo = content.getBestBeaconInfo()?.copy(isLive = false)
+                val beaconContent = content
+                        .copy(unstableBeaconInfo = updatedBeaconInfo)
+                        .toContent()
 
                 beaconInfoStateEvent.stateKey?.let {
                     sendStateEvent(
