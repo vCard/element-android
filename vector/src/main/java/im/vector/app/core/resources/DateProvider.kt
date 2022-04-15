@@ -22,24 +22,24 @@ import org.threeten.bp.ZoneId
 
 object DateProvider {
 
-    private val zoneId = ZoneId.systemDefault()
-    private val zoneOffset by lazy {
+    private val defaultZoneId = ZoneId.systemDefault()
+    private val defaultZoneOffset by lazy {
         val now = currentLocalDateTime()
-        zoneId.rules.getOffset(now)
+        defaultZoneId.rules.getOffset(now)
     }
 
-    fun toLocalDateTime(timestamp: Long?): LocalDateTime {
+    fun toLocalDateTime(timestamp: Long?, zoneId: ZoneId = defaultZoneId): LocalDateTime {
         val instant = Instant.ofEpochMilli(timestamp ?: 0)
         return LocalDateTime.ofInstant(instant, zoneId)
     }
 
     fun currentLocalDateTime(): LocalDateTime {
         val instant = Instant.now()
-        return LocalDateTime.ofInstant(instant, zoneId)
+        return LocalDateTime.ofInstant(instant, defaultZoneId)
     }
 
     fun toTimestamp(localDateTime: LocalDateTime): Long {
-        return localDateTime.toInstant(zoneOffset).toEpochMilli()
+        return localDateTime.toInstant(defaultZoneOffset).toEpochMilli()
     }
 }
 

@@ -16,18 +16,21 @@
 
 package im.vector.app.features.home.room.detail.timeline.helper
 
+import im.vector.app.core.resources.DateProvider
 import im.vector.app.core.utils.TextUtils
 import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.session.events.model.EventType
 import org.matrix.android.sdk.api.session.events.model.toModel
 import org.matrix.android.sdk.api.session.room.model.call.CallInviteContent
-import org.matrix.android.sdk.api.session.room.model.livelocation.BeaconInfo
 import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.model.message.LocationInfo
 import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
 import org.matrix.android.sdk.api.session.widgets.model.WidgetContent
 import org.threeten.bp.Duration
+import org.threeten.bp.LocalDateTime
+import org.threeten.bp.ZoneOffset
+import org.threeten.bp.temporal.ChronoUnit
 
 class TimelineEventsGroup(val groupId: String) {
 
@@ -143,35 +146,64 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
     }
 
     fun getCurrentStatus(): LiveLocationSharingStatus {
+        // if lastLocationContent is not null it will contain location info
+        val lastLocationContent = getLastValidLocationContent()
+        val lastLocationInfo = lastLocationContent?.getBestLocationInfo()
+        val beaconContent = getBeaconContent()
+        val beaconInfo = beaconContent?.getBestBeaconInfo()
+        val isBeaconLive = beaconInfo?.isLive.orFalse()
 
-        val lastLocationInfo = getLastLocationInfo()
-        val beaconInfo = getBeaconInfo()
         return when {
-            lastLocationInfo == null && beaconInfo?.isLive.orFalse() -> LiveLocationSharingStatus.Loading
-            // TODO how to handle beacon timeout?
-            beaconInfo?.isLive.orFalse().not()                       -> LiveLocationSharingStatus.Stopped
-            lastLocationInfo != null                                 -> LiveLocationSharingStatus.Lived(lastLocationInfo)
-            else                                                     -> LiveLocationSharingStatus.Unkwown
+            beaconContent == null                                                                                   -> LiveLocationSharingStatus.Unkwown
+            lastLocationContent == null && isBeaconLive && isBeaconTimedOutComparedToLocalDate(beaconContent).not() -> LiveLocationSharingStatus.Loading
+            isBeaconLive.not() || isBeaconTimedOut(beaconContent, lastLocationContent)                              -> LiveLocationSharingStatus.Stopped
+            lastLocationInfo != null                                                                                -> LiveLocationSharingStatus.Lived(lastLocationInfo)
+            else                                                                                                    -> LiveLocationSharingStatus.Unkwown
         }
     }
 
-    private fun getBeaconInfo(): BeaconInfo? {
+    private fun getBeaconContent(): LiveLocationBeaconContent? {
         val timelineEvent = group.events
                 .firstOrNull { it.root.getClearType() in EventType.STATE_ROOM_BEACON_INFO }
         return timelineEvent
                 ?.root
                 ?.getClearContent()
                 .toModel<LiveLocationBeaconContent>()
-                ?.getBestBeaconInfo()
     }
 
-    private fun getLastLocationInfo(): LocationInfo? {
-        val timelineEvent = group.events
-                .firstOrNull { it.root.getClearType() in EventType.BEACON_LOCATION_DATA }
-        return timelineEvent
-                ?.root
-                ?.getClearContent()
-                .toModel<MessageLiveLocationContent>()
-                ?.getBestLocationInfo()
+    private fun getLastValidLocationContent(): MessageLiveLocationContent? {
+        return group.events
+                .filter { it.root.getClearType() in EventType.BEACON_LOCATION_DATA }
+                .mapNotNull { it.root.getClearContent().toModel<MessageLiveLocationContent>() }
+                .filter { it.getBestLocationInfo() != null }
+                .maxByOrNull { it.getBestTimestampAsMilliseconds() ?: 0 }
+    }
+
+    private fun isBeaconTimedOut(beaconContent: LiveLocationBeaconContent?,
+                                 liveLocationContent: MessageLiveLocationContent?): Boolean {
+        return when {
+            beaconContent != null && liveLocationContent != null -> {
+                val beaconInfoStartTime = beaconContent.getBestTimestampAsMilliseconds() ?: 0
+                val liveLocationEventTime = liveLocationContent.getBestTimestampAsMilliseconds() ?: 0
+                val timeout = beaconContent.getBestBeaconInfo()?.timeout ?: 0
+                // add an extra check based on local datetime
+                liveLocationEventTime - beaconInfoStartTime > timeout || isBeaconTimedOutComparedToLocalDate(beaconContent)
+            }
+            beaconContent != null && liveLocationContent == null -> isBeaconTimedOutComparedToLocalDate(beaconContent)
+            else                                                 -> false
+        }
+    }
+
+    private fun isBeaconTimedOutComparedToLocalDate(beaconContent: LiveLocationBeaconContent): Boolean {
+        return beaconContent.getBestTimestampAsMilliseconds()
+                ?.let { startTimestamp ->
+                    // this will only cover users with different timezones but not users with manually time set
+                    val now = LocalDateTime.now(ZoneOffset.UTC)
+                    val startOfLive = DateProvider.toLocalDateTime(timestamp = startTimestamp, zoneId = ZoneOffset.UTC)
+                    val timeout = beaconContent.getBestBeaconInfo()?.timeout ?: 0
+                    val endOfLive = startOfLive.plus(timeout, ChronoUnit.MILLIS)
+                    now.isAfter(endOfLive)
+                }
+                .orFalse()
     }
 }
