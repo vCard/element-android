@@ -26,6 +26,7 @@ import org.matrix.android.sdk.api.session.crypto.model.OlmDecryptionResult
 import org.matrix.android.sdk.api.session.events.model.content.EncryptedEventContent
 import org.matrix.android.sdk.api.session.room.model.Membership
 import org.matrix.android.sdk.api.session.room.model.RoomMemberContent
+import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageContent
 import org.matrix.android.sdk.api.session.room.model.message.MessagePollContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageStickerContent
@@ -375,11 +376,11 @@ fun Event.getRelationContent(): RelationDefaultContent? {
         content.toModel<EncryptedEventContent>()?.relatesTo
     } else {
         content.toModel<MessageContent>()?.relatesTo ?: run {
-            // Special case to handle stickers, while there is only a local msgtype for stickers
-            if (getClearType() == EventType.STICKER) {
-                getClearContent().toModel<MessageStickerContent>()?.relatesTo
-            } else {
-                null
+            // Special cases to handle events with only a local msgtype
+            when (getClearType()) {
+                EventType.STICKER                   -> getClearContent().toModel<MessageStickerContent>()?.relatesTo
+                in EventType.STATE_ROOM_BEACON_INFO -> getClearContent().toModel<LiveLocationBeaconContent>()?.relatesTo
+                else                                -> null
             }
         }
     }

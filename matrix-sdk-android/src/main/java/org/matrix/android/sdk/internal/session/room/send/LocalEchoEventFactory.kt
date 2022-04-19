@@ -29,6 +29,7 @@ import org.matrix.android.sdk.api.session.events.model.RelationType
 import org.matrix.android.sdk.api.session.events.model.UnsignedData
 import org.matrix.android.sdk.api.session.events.model.toContent
 import org.matrix.android.sdk.api.session.events.model.toModel
+import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.model.message.AudioInfo
 import org.matrix.android.sdk.api.session.room.model.message.AudioWaveformInfo
 import org.matrix.android.sdk.api.session.room.model.message.FileInfo
@@ -268,6 +269,26 @@ internal class LocalEchoEventFactory @Inject constructor(
                 type = EventType.BEACON_LOCATION_DATA.first(),
                 content = content.toContent(),
                 unsignedData = UnsignedData(age = null, transactionId = localId))
+    }
+
+    /**
+     * Used to replace and update the live status flag of a beacon state event.
+     */
+    fun createReplaceLiveBeaconEvent(
+            roomId: String,
+            targetEventId: String,
+            originalContent: LiveLocationBeaconContent,
+            newIsLive: Boolean
+    ): Event {
+        val updatedBeaconInfo = originalContent.getBestBeaconInfo()?.copy(isLive = newIsLive)
+        val newContent = originalContent
+                .copy(
+                        relatesTo = RelationDefaultContent(RelationType.REPLACE, targetEventId),
+                        newContent = originalContent.copy(unstableBeaconInfo = updatedBeaconInfo).toContent()
+                )
+                .toContent()
+
+        return createEvent(roomId, EventType.STATE_ROOM_BEACON_INFO.first(), newContent)
     }
 
     fun createReplaceTextOfReply(roomId: String,

@@ -190,25 +190,6 @@ internal class DefaultStateService @AssistedInject constructor(@Assisted private
         updateJoinRule(RoomJoinRules.RESTRICTED, null, allowEntries)
     }
 
-    override suspend fun stopLiveLocation(userId: String) {
-        getLiveLocationBeaconInfo(userId, true)?.let { beaconInfoStateEvent ->
-            beaconInfoStateEvent.getClearContent()?.toModel<LiveLocationBeaconContent>()?.let { content ->
-                val updatedBeaconInfo = content.getBestBeaconInfo()?.copy(isLive = false)
-                val beaconContent = content
-                        .copy(unstableBeaconInfo = updatedBeaconInfo)
-                        .toContent()
-
-                beaconInfoStateEvent.stateKey?.let {
-                    sendStateEvent(
-                            eventType = EventType.STATE_ROOM_BEACON_INFO.first(),
-                            body = beaconContent,
-                            stateKey = it
-                    )
-                }
-            }
-        }
-    }
-
     override suspend fun getLiveLocationBeaconInfo(userId: String, filterOnlyLive: Boolean): Event? {
         return EventType.STATE_ROOM_BEACON_INFO
                 .mapNotNull {

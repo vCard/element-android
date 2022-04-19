@@ -26,6 +26,7 @@ import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBe
 import org.matrix.android.sdk.api.session.room.model.message.LocationInfo
 import org.matrix.android.sdk.api.session.room.model.message.MessageLiveLocationContent
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
+import org.matrix.android.sdk.api.session.room.timeline.getEditedEventId
 import org.matrix.android.sdk.api.session.widgets.model.WidgetContent
 import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
@@ -62,7 +63,8 @@ class TimelineEventsGroups {
         val content = root.getClearContent()
         return when {
             EventType.isCallEvent(type)                                                       -> (content?.get("call_id") as? String)
-            type in EventType.STATE_ROOM_BEACON_INFO                                          -> root.eventId
+            // use the event id when the event has not been edited yet
+            type in EventType.STATE_ROOM_BEACON_INFO                                          -> getEditedEventId() ?: root.eventId
             type in EventType.BEACON_LOCATION_DATA                                            -> content?.toModel<MessageLiveLocationContent>()?.relatesTo?.eventId
             type == EventType.STATE_ROOM_WIDGET || type == EventType.STATE_ROOM_WIDGET_LEGACY -> root.stateKey
             else                                                                              -> null
@@ -162,12 +164,17 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
     }
 
     private fun getBeaconContent(): LiveLocationBeaconContent? {
+        // retrieve the more recent info and check for new content if any
         val timelineEvent = group.events
-                .firstOrNull { it.root.getClearType() in EventType.STATE_ROOM_BEACON_INFO }
-        return timelineEvent
+                .filter { it.root.getClearType() in EventType.STATE_ROOM_BEACON_INFO }
+                .maxByOrNull { it.root.originServerTs ?: 0 }
+
+        val beaconContent = timelineEvent
                 ?.root
                 ?.getClearContent()
                 .toModel<LiveLocationBeaconContent>()
+
+        return beaconContent?.newContent?.toModel<LiveLocationBeaconContent>() ?: beaconContent
     }
 
     private fun getLastValidLocationContent(): MessageLiveLocationContent? {
