@@ -20,17 +20,26 @@ import androidx.core.view.isVisible
 import com.airbnb.epoxy.EpoxyAttribute
 import com.airbnb.epoxy.EpoxyModelClass
 import im.vector.app.R
+import im.vector.app.core.date.DateFormatKind
+import im.vector.app.core.date.VectorDateFormatter
+import im.vector.app.core.resources.toTimestamp
 import im.vector.app.core.utils.DimensionConverter
 import im.vector.app.features.home.room.detail.timeline.style.TimelineMessageLayout
 import im.vector.app.features.location.live.LocationLiveMessageBannerView
 import im.vector.app.features.location.live.LocationLiveMessageBannerViewState
+import org.threeten.bp.LocalDateTime
 
 @EpoxyModelClass(layout = R.layout.item_timeline_event_base)
 abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocationItem.Holder>() {
 
-    // TODO define the needed attributes
     @EpoxyAttribute
     var currentUserId: String? = null
+
+    @EpoxyAttribute
+    var endOfLiveDateTime: LocalDateTime? = null
+
+    @EpoxyAttribute(EpoxyAttribute.Option.DoNotHash)
+    lateinit var vectorDateFormatter: VectorDateFormatter
 
     override fun bind(holder: Holder) {
         super.bind(holder)
@@ -67,7 +76,7 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
                 LocationLiveMessageBannerViewState.Watcher(
                         bottomStartCornerRadiusInDp = messageLayout.cornersRadius.bottomStartRadius,
                         bottomEndCornerRadiusInDp = messageLayout.cornersRadius.bottomEndRadius,
-                        formattedLocalTimeOfEndOfLive = "12:34",
+                        formattedLocalTimeOfEndOfLive = getFormattedLocalTimeEndOfLive(),
                 )
             isEmitter                                                  -> {
                 val cornerRadius = getBannerCornerRadiusForDefaultLayout(holder)
@@ -83,7 +92,7 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
                 LocationLiveMessageBannerViewState.Watcher(
                         bottomStartCornerRadiusInDp = cornerRadius,
                         bottomEndCornerRadiusInDp = cornerRadius,
-                        formattedLocalTimeOfEndOfLive = "12:34",
+                        formattedLocalTimeOfEndOfLive = getFormattedLocalTimeEndOfLive(),
                 )
             }
         }
@@ -93,6 +102,9 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
         val dimensionConverter = DimensionConverter(holder.view.resources)
         return dimensionConverter.dpToPx(8).toFloat()
     }
+
+    private fun getFormattedLocalTimeEndOfLive() =
+            endOfLiveDateTime?.toTimestamp()?.let { vectorDateFormatter.format(it, DateFormatKind.MESSAGE_SIMPLE) }.orEmpty()
 
     class Holder : AbsMessageLocationItem.Holder() {
         val locationLiveMessageBanner by bind<LocationLiveMessageBannerView>(R.id.locationLiveMessageBanner)

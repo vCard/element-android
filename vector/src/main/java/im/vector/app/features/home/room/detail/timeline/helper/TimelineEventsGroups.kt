@@ -29,7 +29,6 @@ import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
 import org.matrix.android.sdk.api.session.widgets.model.WidgetContent
 import org.threeten.bp.Duration
 import org.threeten.bp.LocalDateTime
-import org.threeten.bp.ZoneOffset
 import org.threeten.bp.temporal.ChronoUnit
 
 class TimelineEventsGroup(val groupId: String) {
@@ -140,7 +139,7 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
 
     sealed class LiveLocationSharingStatus {
         object Loading : LiveLocationSharingStatus()
-        data class Running(val locationInfo: LocationInfo) : LiveLocationSharingStatus()
+        data class Running(val locationInfo: LocationInfo, val endOfLiveDateTime: LocalDateTime?) : LiveLocationSharingStatus()
         object Stopped : LiveLocationSharingStatus()
         object Unkwown : LiveLocationSharingStatus()
     }
@@ -157,7 +156,7 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
             beaconContent == null                                                                                   -> LiveLocationSharingStatus.Unkwown
             lastLocationContent == null && isBeaconLive && isBeaconTimedOutComparedToLocalDate(beaconContent).not() -> LiveLocationSharingStatus.Loading
             isBeaconLive.not() || isBeaconTimedOut(beaconContent, lastLocationContent)                              -> LiveLocationSharingStatus.Stopped
-            lastLocationInfo != null                                                                                -> LiveLocationSharingStatus.Running(lastLocationInfo)
+            lastLocationInfo != null                                                                                -> LiveLocationSharingStatus.Running(lastLocationInfo, getEndOfLiveDateTime(beaconContent))
             else                                                                                                    -> LiveLocationSharingStatus.Unkwown
         }
     }
@@ -195,15 +194,21 @@ class LiveLocationEventsGroup(private val group: TimelineEventsGroup) {
     }
 
     private fun isBeaconTimedOutComparedToLocalDate(beaconContent: LiveLocationBeaconContent): Boolean {
-        return beaconContent.getBestTimestampAsMilliseconds()
-                ?.let { startTimestamp ->
+        return getEndOfLiveDateTime(beaconContent)
+                ?.let { endOfLive ->
                     // this will only cover users with different timezones but not users with manually time set
-                    val now = LocalDateTime.now(ZoneOffset.UTC)
-                    val startOfLive = DateProvider.toLocalDateTime(timestamp = startTimestamp, zoneId = ZoneOffset.UTC)
-                    val timeout = beaconContent.getBestBeaconInfo()?.timeout ?: 0
-                    val endOfLive = startOfLive.plus(timeout, ChronoUnit.MILLIS)
+                    val now = LocalDateTime.now()
                     now.isAfter(endOfLive)
                 }
                 .orFalse()
+    }
+
+    private fun getEndOfLiveDateTime(beaconContent: LiveLocationBeaconContent): LocalDateTime? {
+        return beaconContent.getBestTimestampAsMilliseconds()
+                ?.let { startTimestamp ->
+                    val startOfLive = DateProvider.toLocalDateTime(timestamp = startTimestamp)
+                    val timeout = beaconContent.getBestBeaconInfo()?.timeout ?: 0
+                    startOfLive.plus(timeout, ChronoUnit.MILLIS)
+                }
     }
 }

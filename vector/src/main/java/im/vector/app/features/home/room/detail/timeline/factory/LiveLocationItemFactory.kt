@@ -16,6 +16,7 @@
 
 package im.vector.app.features.home.room.detail.timeline.factory
 
+import im.vector.app.core.date.VectorDateFormatter
 import im.vector.app.core.epoxy.VectorEpoxyModel
 import im.vector.app.core.resources.UserPreferencesProvider
 import im.vector.app.core.utils.DimensionConverter
@@ -34,7 +35,6 @@ import im.vector.app.features.location.INITIAL_MAP_ZOOM_IN_TIMELINE
 import im.vector.app.features.location.UrlMapProvider
 import im.vector.app.features.location.toLocationData
 import org.matrix.android.sdk.api.session.Session
-import org.matrix.android.sdk.api.session.room.model.message.LocationInfo
 import javax.inject.Inject
 
 class LiveLocationItemFactory @Inject constructor(
@@ -47,7 +47,8 @@ class LiveLocationItemFactory @Inject constructor(
         private val timelineMediaSizeProvider: TimelineMediaSizeProvider,
         private val avatarSizeProvider: AvatarSizeProvider,
         private val urlMapProvider: UrlMapProvider,
-        private val locationPinProvider: LocationPinProvider
+        private val locationPinProvider: LocationPinProvider,
+        private val vectorDateFormatter: VectorDateFormatter,
 ) {
 
     fun create(params: TimelineItemFactoryParams): VectorEpoxyModel<*>? {
@@ -60,7 +61,7 @@ class LiveLocationItemFactory @Inject constructor(
         val item = when (val currentStatus = liveLocationEventGroup.getCurrentStatus()) {
             LiveLocationEventsGroup.LiveLocationSharingStatus.Loading    -> buildLoadingItem(params.isHighlighted, attributes)
             LiveLocationEventsGroup.LiveLocationSharingStatus.Stopped    -> buildStoppedItem()
-            is LiveLocationEventsGroup.LiveLocationSharingStatus.Running -> buildRunningItem(params.isHighlighted, attributes, currentStatus.locationInfo)
+            is LiveLocationEventsGroup.LiveLocationSharingStatus.Running -> buildRunningItem(params.isHighlighted, attributes, currentStatus)
             LiveLocationEventsGroup.LiveLocationSharingStatus.Unkwown    -> null
         }
         item?.layout(attributes.informationData.messageLayout.layoutRes)
@@ -96,12 +97,12 @@ class LiveLocationItemFactory @Inject constructor(
     private fun buildRunningItem(
             highlight: Boolean,
             attributes: AbsMessageItem.Attributes,
-            locationInfo: LocationInfo,
+            runningStatus: LiveLocationEventsGroup.LiveLocationSharingStatus.Running,
     ): MessageLiveLocationItem {
         val width = timelineMediaSizeProvider.getMaxSize().first
         val height = dimensionConverter.dpToPx(MessageItemFactory.MESSAGE_LOCATION_ITEM_HEIGHT_IN_DP)
 
-        val locationUrl = locationInfo.toLocationData()?.let {
+        val locationUrl = runningStatus.locationInfo.toLocationData()?.let {
             urlMapProvider.buildStaticMapUrl(it, INITIAL_MAP_ZOOM_IN_TIMELINE, width, height)
         }
 
@@ -115,5 +116,7 @@ class LiveLocationItemFactory @Inject constructor(
                 .highlighted(highlight)
                 .leftGuideline(avatarSizeProvider.leftGuideline)
                 .currentUserId(session.myUserId)
+                .endOfLiveDateTime(runningStatus.endOfLiveDateTime)
+                .vectorDateFormatter(vectorDateFormatter)
     }
 }
