@@ -67,7 +67,7 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
         return when {
             messageLayout is TimelineMessageLayout.Bubble && isEmitter ->
                 LocationLiveMessageBannerViewState.Emitter(
-                        remainingTimeInMillis = 4000 * 1000L,
+                        remainingTimeInMillis = getRemainingTimeOfLiveInMillis(),
                         bottomStartCornerRadiusInDp = messageLayout.cornersRadius.bottomStartRadius,
                         bottomEndCornerRadiusInDp = messageLayout.cornersRadius.bottomEndRadius,
                         isStopButtonCenteredVertically = false
@@ -81,7 +81,7 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
             isEmitter                                                  -> {
                 val cornerRadius = getBannerCornerRadiusForDefaultLayout(holder)
                 LocationLiveMessageBannerViewState.Emitter(
-                        remainingTimeInMillis = 4000 * 1000L,
+                        remainingTimeInMillis = getRemainingTimeOfLiveInMillis(),
                         bottomStartCornerRadiusInDp = cornerRadius,
                         bottomEndCornerRadiusInDp = cornerRadius,
                         isStopButtonCenteredVertically = true
@@ -105,6 +105,9 @@ abstract class MessageLiveLocationItem : AbsMessageLocationItem<MessageLiveLocat
 
     private fun getFormattedLocalTimeEndOfLive() =
             endOfLiveDateTime?.toTimestamp()?.let { vectorDateFormatter.format(it, DateFormatKind.MESSAGE_SIMPLE) }.orEmpty()
+
+    private fun getRemainingTimeOfLiveInMillis() =
+            (endOfLiveDateTime?.toTimestamp() ?: 0) - LocalDateTime.now().toTimestamp()
 
     class Holder : AbsMessageLocationItem.Holder() {
         val locationLiveMessageBanner by bind<LocationLiveMessageBannerView>(R.id.locationLiveMessageBanner)
