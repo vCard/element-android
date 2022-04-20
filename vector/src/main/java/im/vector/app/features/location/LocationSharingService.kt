@@ -82,12 +82,14 @@ class LocationSharingService : VectorService(), LocationTracker.Callback {
             // Schedule a timer to stop sharing
             scheduleTimer(roomArgs.roomId, roomArgs.durationMillis)
 
-            // Send beacon info state event
+            // Send beacon info state event to start sharing
             activeSessionHolder
                     .getSafeActiveSession()
                     ?.let { session ->
                         session.coroutineScope.launch(session.coroutineDispatchers.io) {
                             sendLiveBeaconInfo(session, roomArgs)
+                            // make sure we send a location right after starting the live
+                            locationTracker.requestLastKnownLocation()
                         }
                     }
         }

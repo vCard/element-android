@@ -40,7 +40,8 @@ class LocationTracker @Inject constructor(
         fun onLocationProviderIsNotAvailable()
     }
 
-    private var callbacks = mutableListOf<Callback>()
+    private val providers = arrayListOf<String>()
+    private val callbacks = mutableListOf<Callback>()
 
     private var hasGpsProviderLiveLocation = false
 
@@ -55,6 +56,8 @@ class LocationTracker @Inject constructor(
             return
         }
 
+        providers.clear()
+
         locationManager.allProviders
                 .takeIf { it.isNotEmpty() }
                 // Take GPS first
@@ -62,15 +65,10 @@ class LocationTracker @Inject constructor(
                 ?.forEach { provider ->
                     Timber.d("## LocationTracker. track location using $provider")
 
-                    // Send last known location without waiting location updates
-                    locationManager.getLastKnownLocation(provider)?.let { lastKnownLocation ->
-                        if (BuildConfig.LOW_PRIVACY_LOG_ENABLE) {
-                            Timber.d("## LocationTracker. lastKnownLocation: $lastKnownLocation")
-                        } else {
-                            Timber.d("## LocationTracker. lastKnownLocation: ${lastKnownLocation.provider}")
-                        }
-                        notifyLocation(lastKnownLocation, isLive = false)
-                    }
+                    providers.add(provider)
+
+                    // Notify last known location without waiting location updates
+                    notifyLastKnownLocation(locationManager, provider)
 
                     locationManager.requestLocationUpdates(
                             provider,
@@ -90,6 +88,31 @@ class LocationTracker @Inject constructor(
         Timber.d("## LocationTracker. stop()")
         locationManager?.removeUpdates(this)
         callbacks.clear()
+        providers.clear()
+    }
+
+    /**
+     * Request the last known location. It will be given async through Callback.
+     * Please ensure adding a callback to receive the value.
+     */
+    fun requestLastKnownLocation() {
+        locationManager?.let { locManager ->
+            val iterator = providers.iterator()
+            while (iterator.hasNext()) {
+                notifyLastKnownLocation(locManager, iterator.next())
+            }
+        }
+    }
+
+    private fun notifyLastKnownLocation(locationManager: LocationManager, provider: String) {
+        locationManager.getLastKnownLocation(provider)?.let { lastKnownLocation ->
+            if (BuildConfig.LOW_PRIVACY_LOG_ENABLE) {
+                Timber.d("## LocationTracker. lastKnownLocation: $lastKnownLocation")
+            } else {
+                Timber.d("## LocationTracker. lastKnownLocation: ${lastKnownLocation.provider}")
+            }
+            notifyLocation(lastKnownLocation, isLive = false)
+        }
     }
 
     fun addCallback(callback: Callback) {
