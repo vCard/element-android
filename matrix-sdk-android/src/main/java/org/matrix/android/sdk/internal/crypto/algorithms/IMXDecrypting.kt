@@ -21,6 +21,7 @@ import org.matrix.android.sdk.api.session.crypto.model.IncomingRoomKeyRequest
 import org.matrix.android.sdk.api.session.crypto.model.IncomingSecretShareRequest
 import org.matrix.android.sdk.api.session.crypto.model.MXEventDecryptionResult
 import org.matrix.android.sdk.api.session.events.model.Event
+import org.matrix.android.sdk.internal.crypto.MegolmSessionData
 import org.matrix.android.sdk.internal.crypto.keysbackup.DefaultKeysBackupService
 
 /**
@@ -59,6 +60,8 @@ internal interface IMXDecrypting {
      * @param request keyRequest
      */
     fun shareKeysWithDevice(request: IncomingRoomKeyRequest) {}
+
+    fun shareKeysWithDevice(exportedKeys: MegolmSessionData?, deviceId: String, userId: String) {}
 
     fun shareSecretWithDevice(request: IncomingSecretShareRequest, secretValue: String) {}
 
