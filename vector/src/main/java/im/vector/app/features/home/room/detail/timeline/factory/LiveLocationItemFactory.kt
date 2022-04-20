@@ -99,6 +99,7 @@ class LiveLocationItemFactory @Inject constructor(
             attributes: AbsMessageItem.Attributes,
             runningStatus: LiveLocationEventsGroup.LiveLocationSharingStatus.Running,
     ): MessageLiveLocationItem {
+        // TODO only render location if enabled in preferences: to be handled in a next PR
         val width = timelineMediaSizeProvider.getMaxSize().first
         val height = dimensionConverter.dpToPx(MessageItemFactory.MESSAGE_LOCATION_ITEM_HEIGHT_IN_DP)
 
