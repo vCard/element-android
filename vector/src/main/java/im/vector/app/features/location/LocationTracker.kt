@@ -18,6 +18,7 @@ package im.vector.app.features.location
 
 import android.Manifest
 import android.content.Context
+import android.location.Criteria
 import android.location.Location
 import android.location.LocationManager
 import androidx.annotation.RequiresPermission
@@ -40,15 +41,12 @@ class LocationTracker @Inject constructor(
         fun onLocationProviderIsNotAvailable()
     }
 
-    private val providers = arrayListOf<String>()
+    private var currentProvider: String? = null
     private val callbacks = mutableListOf<Callback>()
-
-    private var hasGpsProviderLiveLocation = false
 
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     fun start() {
         Timber.d("## LocationTracker. start()")
-        hasGpsProviderLiveLocation = false
 
         if (locationManager == null) {
             callbacks.forEach { it.onLocationProviderIsNotAvailable() }
@@ -56,16 +54,14 @@ class LocationTracker @Inject constructor(
             return
         }
 
-        providers.clear()
+        currentProvider = null
 
-        locationManager.allProviders
-                .takeIf { it.isNotEmpty() }
-                // Take GPS first
-                ?.sortedByDescending { if (it == LocationManager.GPS_PROVIDER) 1 else 0 }
-                ?.forEach { provider ->
+        val criteria = getProviderCriteria()
+        locationManager.getBestProvider(criteria, true)
+                ?.let { provider ->
                     Timber.d("## LocationTracker. track location using $provider")
 
-                    providers.add(provider)
+                    currentProvider = provider
 
                     // Notify last known location without waiting location updates
                     notifyLastKnownLocation(locationManager, provider)
@@ -88,7 +84,6 @@ class LocationTracker @Inject constructor(
         Timber.d("## LocationTracker. stop()")
         locationManager?.removeUpdates(this)
         callbacks.clear()
-        providers.clear()
     }
 
     /**
@@ -97,11 +92,17 @@ class LocationTracker @Inject constructor(
      */
     fun requestLastKnownLocation() {
         locationManager?.let { locManager ->
-            val iterator = providers.iterator()
-            while (iterator.hasNext()) {
-                notifyLastKnownLocation(locManager, iterator.next())
+            currentProvider?.let {
+                notifyLastKnownLocation(locManager, it)
             }
         }
+    }
+
+    private fun getProviderCriteria(): Criteria {
+        val criteria = Criteria()
+        criteria.accuracy = Criteria.ACCURACY_FINE
+        criteria.powerRequirement = Criteria.POWER_MEDIUM
+        return criteria
     }
 
     private fun notifyLastKnownLocation(locationManager: LocationManager, provider: String) {
@@ -111,7 +112,7 @@ class LocationTracker @Inject constructor(
             } else {
                 Timber.d("## LocationTracker. lastKnownLocation: ${lastKnownLocation.provider}")
             }
-            notifyLocation(lastKnownLocation, isLive = false)
+            notifyLocation(lastKnownLocation)
         }
     }
 
@@ -134,22 +135,10 @@ class LocationTracker @Inject constructor(
         } else {
             Timber.d("## LocationTracker. onLocationChanged: ${location.provider}")
         }
-        notifyLocation(location, isLive = true)
+        notifyLocation(location)
     }
 
-    private fun notifyLocation(location: Location, isLive: Boolean) {
-        when (location.provider) {
-            LocationManager.GPS_PROVIDER -> {
-                hasGpsProviderLiveLocation = isLive
-            }
-            else                         -> {
-                if (hasGpsProviderLiveLocation) {
-                    // Ignore this update
-                    Timber.d("## LocationTracker. ignoring location from ${location.provider}, we have gps live location")
-                    return
-                }
-            }
-        }
+    private fun notifyLocation(location: Location) {
         callbacks.forEach { it.onLocationUpdate(location.toLocationData()) }
     }
 
