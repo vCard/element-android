@@ -73,25 +73,7 @@ class LocationSharingService : VectorService(), LocationTracker.Callback {
         Timber.i("### LocationSharingService.onStartCommand. sessionId - roomId ${roomArgs?.sessionId} - ${roomArgs?.roomId}")
 
         if (roomArgs != null) {
-            roomArgsList.add(roomArgs)
-
-            // Show a sticky notification
-            val notification = notificationUtils.buildLiveLocationSharingNotification()
-            startForeground(roomArgs.roomId.hashCode(), notification)
-
-            // Schedule a timer to stop sharing
-            scheduleTimer(roomArgs.roomId, roomArgs.durationMillis)
-
-            // Send beacon info state event to start sharing
-            activeSessionHolder
-                    .getSafeActiveSession()
-                    ?.let { session ->
-                        session.coroutineScope.launch(session.coroutineDispatchers.io) {
-                            sendLiveBeaconInfo(session, roomArgs)
-                            // make sure we send a location right after starting the live
-                            locationTracker.requestLastKnownLocation()
-                        }
-                    }
+            startSharingLocation(roomArgs)
         }
 
         return START_STICKY
@@ -131,18 +113,43 @@ class LocationSharingService : VectorService(), LocationTracker.Callback {
                 }
     }
 
+    @Synchronized
+    private fun startSharingLocation(roomArgs: RoomArgs) {
+        // Show a sticky notification
+        val notification = notificationUtils.buildLiveLocationSharingNotification()
+        startForeground(roomArgs.roomId.hashCode(), notification)
+
+        // Send beacon info state event to start sharing
+        activeSessionHolder
+                .getSafeActiveSession()
+                ?.let { session ->
+                    session.coroutineScope.launch(session.coroutineDispatchers.io) {
+                        Timber.i("Sending live beacon info for roomId: ${roomArgs.roomId}")
+                        sendLiveBeaconInfo(session, roomArgs)
+
+                        // Add the args in the list after sending the beacon to associate locations to the correct beacon
+                        roomArgsList.add(roomArgs)
+
+                        // Schedule a timer to stop sharing
+                        scheduleTimer(roomArgs.roomId, roomArgs.durationMillis)
+
+                        // make sure we send a location right after starting the live
+                        locationTracker.requestLastKnownLocation()
+                    }
+                }
+    }
+
+    @Synchronized
     fun stopSharingLocation(roomId: String) {
         Timber.i("### LocationSharingService.stopSharingLocation for $roomId")
 
         // Send a new beacon info state by setting live field as false
         sendStoppedBeaconInfo(roomId)
 
-        synchronized(roomArgsList) {
-            roomArgsList.removeAll { it.roomId == roomId }
-            if (roomArgsList.isEmpty()) {
-                Timber.i("### LocationSharingService. Destroying self, time is up for all rooms")
-                destroyMe()
-            }
+        roomArgsList.removeAll { it.roomId == roomId }
+        if (roomArgsList.isEmpty()) {
+            Timber.i("### LocationSharingService. Destroying self, time is up for all rooms")
+            destroyMe()
         }
     }
 
@@ -189,6 +196,7 @@ class LocationSharingService : VectorService(), LocationTracker.Callback {
                 .getLiveLocationBeaconInfo(userId, true)
                 ?.eventId
                 ?.let {
+                    Timber.i("Sending live location $locationData for roomId: $roomId and beacon eventId: $it")
                     room.sendLiveLocation(
                             beaconInfoEventId = it,
                             latitude = locationData.latitude,

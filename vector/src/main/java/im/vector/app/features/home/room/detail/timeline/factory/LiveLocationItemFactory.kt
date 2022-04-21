@@ -35,6 +35,7 @@ import im.vector.app.features.location.INITIAL_MAP_ZOOM_IN_TIMELINE
 import im.vector.app.features.location.UrlMapProvider
 import im.vector.app.features.location.toLocationData
 import org.matrix.android.sdk.api.session.Session
+import timber.log.Timber
 import javax.inject.Inject
 
 class LiveLocationItemFactory @Inject constructor(
@@ -65,6 +66,8 @@ class LiveLocationItemFactory @Inject constructor(
             LiveLocationEventsGroup.LiveLocationSharingStatus.Unkwown    -> null
         }
         item?.layout(attributes.informationData.messageLayout.layoutRes)
+
+        Timber.i("Live status: ${liveLocationEventGroup.getCurrentStatus()}, groupId: ${params.eventsGroup.groupId}, event number: ${params.eventsGroup.events.size}")
 
         return if (item == null && showHiddenEvents) {
             // Fallback to notice item for showing hidden events
