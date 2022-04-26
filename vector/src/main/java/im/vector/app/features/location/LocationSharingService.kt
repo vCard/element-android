@@ -158,15 +158,7 @@ class LocationSharingService : VectorService(), LocationTracker.Callback {
                 .getSafeActiveSession()
                 ?.let { session ->
                     session.coroutineScope.launch(session.coroutineDispatchers.io) {
-                        session.getRoom(roomId)
-                                ?.getLiveLocationBeaconInfo(
-                                        userId = session.myUserId,
-                                        filterOnlyLive = true
-                                )
-                                ?.eventId
-                                ?.let { targetEventId ->
-                                    session.getRoom(roomId)?.stopLiveLocationSharing(targetEventId)
-                                }
+                        session.getRoom(roomId)?.stopLiveLocation(session.myUserId)
                     }
                 }
     }
