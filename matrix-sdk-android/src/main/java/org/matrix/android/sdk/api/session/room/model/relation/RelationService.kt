@@ -107,12 +107,6 @@ interface RelationService {
                   compatibilityBodyText: String = "* $newBodyText"): Cancelable
 
     /**
-     * Stops sharing live location in the room
-     * @param targetEventId id of the beacon state event to replace to indicate the share is stopped
-     */
-    fun stopLiveLocationSharing(targetEventId: String): Cancelable
-
-    /**
      * Get the edit history of the given event
      * The return list will contain the original event and all the editions of this event, done by the
      * same sender, sorted in the reverse order (so the original event is the latest element, and the

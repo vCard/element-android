@@ -121,7 +121,6 @@ class TimelineItemFactory @Inject constructor(
                     EventType.CALL_ANSWER             -> callItemFactory.create(params)
                     // Live location sharing
                     in EventType.BEACON_LOCATION_DATA -> noticeItemFactory.create(params)
-                    in EventType.STATE_ROOM_BEACON_INFO -> liveLocationItemFactory.create(params)
                     // Crypto
                     EventType.ENCRYPTED               -> {
                         if (event.root.isRedacted()) {

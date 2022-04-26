@@ -114,16 +114,6 @@ internal class DefaultRelationService @AssistedInject constructor(
         return eventEditor.editReply(replyToEdit, originalTimelineEvent, newBodyText, compatibilityBodyText)
     }
 
-    override fun stopLiveLocationSharing(targetEventId: String): Cancelable {
-        val targetTimelineEvent = timelineEventDataSource.getTimelineEvent(roomId, targetEventId)
-        return if (targetTimelineEvent == null) {
-            Timber.w("No timeline event found for id: $targetEventId")
-            NoOpCancellable
-        } else {
-            eventEditor.editLiveBeaconAsStopped(targetTimelineEvent)
-        }
-    }
-
     override suspend fun fetchEditHistory(eventId: String): List<Event> {
         return fetchEditHistoryTask.execute(FetchEditHistoryTask.Params(roomId, eventId))
     }

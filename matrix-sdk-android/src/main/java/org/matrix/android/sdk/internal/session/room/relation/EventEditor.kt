@@ -17,8 +17,6 @@
 package org.matrix.android.sdk.internal.session.room.relation
 
 import org.matrix.android.sdk.api.session.events.model.Event
-import org.matrix.android.sdk.api.session.events.model.toModel
-import org.matrix.android.sdk.api.session.room.model.livelocation.LiveLocationBeaconContent
 import org.matrix.android.sdk.api.session.room.model.message.MessageType
 import org.matrix.android.sdk.api.session.room.model.message.PollType
 import org.matrix.android.sdk.api.session.room.send.SendState
@@ -76,29 +74,6 @@ internal class EventEditor @Inject constructor(private val eventSenderProcessor:
         } else {
             Timber.w("Can't edit a sending event")
             return NoOpCancellable
-        }
-    }
-
-    fun editLiveBeaconAsStopped(targetEvent: TimelineEvent): Cancelable {
-        return if (targetEvent.root.sendState.isSent()) {
-            targetEvent.root.getClearContent()
-                    ?.toModel<LiveLocationBeaconContent>()
-                    ?.let { originalContent ->
-                        val event = eventFactory.createReplaceLiveBeaconEvent(
-                                roomId = targetEvent.roomId,
-                                targetEventId = targetEvent.eventId,
-                                originalContent = originalContent,
-                                newIsLive = false
-                        )
-                        sendReplaceEvent(event)
-                    }
-                    ?: run {
-                        Timber.w("Content of the event seems to be of incorrect type")
-                        NoOpCancellable
-                    }
-        } else {
-            Timber.w("Can't edit state event which has not been fully synced")
-            NoOpCancellable
         }
     }
 
