@@ -61,7 +61,7 @@ internal interface IMXDecrypting {
      */
     fun shareKeysWithDevice(request: IncomingRoomKeyRequest) {}
 
-    fun shareKeysWithDevice(exportedKeys: MegolmSessionData?, deviceId: String, userId: String) {}
+    fun shareForwardKeysWithDevice(exportedKeys: MegolmSessionData?, deviceId: String, userId: String) {}
 
     fun shareSecretWithDevice(request: IncomingSecretShareRequest, secretValue: String) {}
 

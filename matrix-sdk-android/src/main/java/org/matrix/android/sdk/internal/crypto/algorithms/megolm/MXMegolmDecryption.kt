@@ -352,7 +352,7 @@ internal class MXMegolmDecryption(private val userId: String,
         return olmDevice.hasInboundSessionKeys(roomId, senderKey, sessionId)
     }
 
-    override fun shareKeysWithDevice(exportedKeys: MegolmSessionData?, deviceId: String, userId: String) {
+    override fun shareForwardKeysWithDevice(exportedKeys: MegolmSessionData?, deviceId: String, userId: String) {
         exportedKeys ?: return
         cryptoCoroutineScope.launch(coroutineDispatchers.crypto) {
             runCatching { deviceListManager.downloadKeys(listOf(userId), false) }
