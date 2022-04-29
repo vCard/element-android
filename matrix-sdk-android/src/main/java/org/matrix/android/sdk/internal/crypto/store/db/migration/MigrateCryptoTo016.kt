@@ -19,6 +19,7 @@ package org.matrix.android.sdk.internal.crypto.store.db.migration
 import io.realm.DynamicRealm
 import org.matrix.android.sdk.internal.crypto.store.db.model.CryptoRoomEntityFields
 import org.matrix.android.sdk.internal.crypto.store.db.model.OlmInboundGroupSessionEntityFields
+import org.matrix.android.sdk.internal.crypto.store.db.model.OutboundGroupSessionInfoEntityFields
 import org.matrix.android.sdk.internal.util.database.RealmMigrator
 
 // Version 16L enhance OlmInboundGroupSessionEntity to support shared history for MSC3061
@@ -31,5 +32,8 @@ internal class MigrateCryptoTo016(realm: DynamicRealm) : RealmMigrator(realm, 16
 
         realm.schema.get("CryptoRoomEntity")
                 ?.addField(CryptoRoomEntityFields.SHOULD_SHARE_HISTORY, Boolean::class.java)
+
+        realm.schema.get("OutboundGroupSessionInfoEntity")
+                ?.addField(OutboundGroupSessionInfoEntityFields.SHOULD_SHARE_HISTORY, Boolean::class.java)
     }
 }
