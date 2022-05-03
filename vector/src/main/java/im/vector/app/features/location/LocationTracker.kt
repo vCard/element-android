@@ -44,6 +44,8 @@ class LocationTracker @Inject constructor(
 
     private var hasGpsProviderLiveLocation = false
 
+    private var lastLocationUpdateMillis: Long? = null
+
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     fun start() {
         Timber.d("## LocationTracker. start()")
@@ -82,7 +84,7 @@ class LocationTracker @Inject constructor(
                         } else {
                             Timber.d("## LocationTracker. lastKnownLocation: ${latestKnownLocation.provider}")
                         }
-                        notifyLocation(latestKnownLocation, isLive = false)
+                        notifyLocation(latestKnownLocation)
                     }
         }
     }
@@ -113,14 +115,10 @@ class LocationTracker @Inject constructor(
         } else {
             Timber.d("## LocationTracker. onLocationChanged: ${location.provider}")
         }
-        notifyLocation(location, isLive = true)
-    }
 
-    private fun notifyLocation(location: Location, isLive: Boolean) {
-        Timber.d("## LocationTracker. notify location")
         when (location.provider) {
             LocationManager.GPS_PROVIDER -> {
-                hasGpsProviderLiveLocation = isLive
+                hasGpsProviderLiveLocation = true
             }
             else                         -> {
                 if (hasGpsProviderLiveLocation) {
@@ -130,6 +128,19 @@ class LocationTracker @Inject constructor(
                 }
             }
         }
+
+        val nowMillis = System.currentTimeMillis()
+        val elapsedMillis = nowMillis - (lastLocationUpdateMillis ?: 0)
+        if (elapsedMillis >= MIN_TIME_TO_UPDATE_LOCATION_MILLIS) {
+            lastLocationUpdateMillis = nowMillis
+            notifyLocation(location)
+        } else {
+            Timber.d("## LocationTracker. ignoring location: update is too fast")
+        }
+    }
+
+    private fun notifyLocation(location: Location) {
+        Timber.d("## LocationTracker. notify location")
         callbacks.forEach { it.onLocationUpdate(location.toLocationData()) }
     }
 
