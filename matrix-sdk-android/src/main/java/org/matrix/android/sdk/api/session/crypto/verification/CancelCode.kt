@@ -29,7 +29,7 @@ enum class CancelCode(val value: String, val humanReadable: String) {
     UserError("m.user_error", "User error"),
     MismatchedUser("m.user_mismatch", "User mismatch"),
     QrCodeInvalid("m.qr_code.invalid", "Invalid QR code"),
-    Accepted("m.accepted", "Verification request accepted by another device")
+    AcceptedByOtherDevice("m.accepted", "Verification request accepted by another device")
 }
 
 fun safeValueOf(code: String?): CancelCode {

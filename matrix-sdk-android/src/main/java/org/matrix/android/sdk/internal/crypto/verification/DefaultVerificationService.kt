@@ -956,9 +956,7 @@ internal class DefaultVerificationService @Inject constructor(
     private fun notifyOthersOfAcceptance(transactionId: String, otherUserId: String, fromDeviceId: String) {
         val deviceIds = getOtherDeviceIds().filter { it != fromDeviceId }
         val transport = verificationTransportToDeviceFactory.createTransport(null)
-        deviceIds.forEach { deviceId ->
-            transport.cancelTransaction(transactionId, otherUserId, deviceId, CancelCode.Accepted)
-        }
+        transport.cancelTransaction(transactionId, otherUserId, deviceIds, CancelCode.AcceptedByOtherDevice)
     }
 
     private fun createQrCodeData(requestId: String?, otherUserId: String, otherDeviceId: String?): QrCodeData? {
