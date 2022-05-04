@@ -54,6 +54,7 @@ import org.matrix.android.sdk.internal.crypto.MXOlmDevice
 import org.matrix.android.sdk.internal.crypto.MegolmSessionData
 import org.matrix.android.sdk.internal.crypto.ObjectSigner
 import org.matrix.android.sdk.internal.crypto.actions.MegolmSessionDataImporter
+import org.matrix.android.sdk.internal.crypto.crosssigning.CrossSigningOlm
 import org.matrix.android.sdk.internal.crypto.keysbackup.model.SignalableMegolmBackupAuthData
 import org.matrix.android.sdk.internal.crypto.keysbackup.model.rest.BackupKeysResult
 import org.matrix.android.sdk.internal.crypto.keysbackup.model.rest.CreateKeysBackupVersionBody
@@ -63,16 +64,11 @@ import org.matrix.android.sdk.internal.crypto.keysbackup.model.rest.RoomKeysBack
 import org.matrix.android.sdk.internal.crypto.keysbackup.model.rest.UpdateKeysBackupVersionBody
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.CreateKeysBackupVersionTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.DeleteBackupTask
-import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.DeleteRoomSessionDataTask
-import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.DeleteRoomSessionsDataTask
-import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.DeleteSessionsDataTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.GetKeysBackupLastVersionTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.GetKeysBackupVersionTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.GetRoomSessionDataTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.GetRoomSessionsDataTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.GetSessionsDataTask
-import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.StoreRoomSessionDataTask
-import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.StoreRoomSessionsDataTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.StoreSessionsDataTask
 import org.matrix.android.sdk.internal.crypto.keysbackup.tasks.UpdateKeysBackupVersionTask
 import org.matrix.android.sdk.internal.crypto.model.OlmInboundGroupSessionWrapper2
@@ -107,21 +103,17 @@ internal class DefaultKeysBackupService @Inject constructor(
         private val cryptoStore: IMXCryptoStore,
         private val olmDevice: MXOlmDevice,
         private val objectSigner: ObjectSigner,
+        private val crossSigningOlm: CrossSigningOlm,
         // Actions
         private val megolmSessionDataImporter: MegolmSessionDataImporter,
         // Tasks
         private val createKeysBackupVersionTask: CreateKeysBackupVersionTask,
         private val deleteBackupTask: DeleteBackupTask,
-        private val deleteRoomSessionDataTask: DeleteRoomSessionDataTask,
-        private val deleteRoomSessionsDataTask: DeleteRoomSessionsDataTask,
-        private val deleteSessionDataTask: DeleteSessionsDataTask,
         private val getKeysBackupLastVersionTask: GetKeysBackupLastVersionTask,
         private val getKeysBackupVersionTask: GetKeysBackupVersionTask,
         private val getRoomSessionDataTask: GetRoomSessionDataTask,
         private val getRoomSessionsDataTask: GetRoomSessionsDataTask,
         private val getSessionsDataTask: GetSessionsDataTask,
-        private val storeRoomSessionDataTask: StoreRoomSessionDataTask,
-        private val storeSessionsDataTask: StoreRoomSessionsDataTask,
         private val storeSessionDataTask: StoreSessionsDataTask,
         private val updateKeysBackupVersionTask: UpdateKeysBackupVersionTask,
         // Task executor
@@ -206,11 +198,27 @@ internal class DefaultKeysBackupService @Inject constructor(
 
                     val canonicalJson = JsonCanonicalizer.getCanonicalJson(Map::class.java, signalableMegolmBackupAuthData.signalableJSONDictionary())
 
+                    val signatures = mutableMapOf<String, MutableMap<String, String>>()
+
+                    val deviceSignature = objectSigner.signObject(canonicalJson)
+                    deviceSignature.forEach { (userID, content) ->
+                        signatures[userID] = content.toMutableMap()
+                    }
+
+                    // If we have cross signing add signature, will throw if cross signing not properly configured
+                    try {
+                        val crossSign = crossSigningOlm.signObject(CrossSigningOlm.KeyType.MASTER, canonicalJson)
+                        signatures[credentials.userId]?.putAll(crossSign)
+                    } catch (failure: Throwable) {
+                        // ignore and log
+                        Timber.w(failure, "prepareKeysBackupVersion: failed to sign with cross signing keys")
+                    }
+
                     val signedMegolmBackupAuthData = MegolmBackupAuthData(
                             publicKey = signalableMegolmBackupAuthData.publicKey,
                             privateKeySalt = signalableMegolmBackupAuthData.privateKeySalt,
                             privateKeyIterations = signalableMegolmBackupAuthData.privateKeyIterations,
-                            signatures = objectSigner.signObject(canonicalJson)
+                            signatures = signatures
                     )
 
                     MegolmBackupCreationInfo(
@@ -427,18 +435,41 @@ internal class DefaultKeysBackupService @Inject constructor(
 
         for ((keyId, mySignature) in mySigs) {
             // XXX: is this how we're supposed to get the device id?
-            var deviceId: String? = null
+            var deviceOrCrossSigningKeyId: String? = null
             val components = keyId.split(":")
             if (components.size == 2) {
-                deviceId = components[1]
+                deviceOrCrossSigningKeyId = components[1]
             }
 
-            if (deviceId != null) {
-                val device = cryptoStore.getUserDevice(userId, deviceId)
+            // Let's check if it's my master key
+            val myMSKPKey = cryptoStore.getMyCrossSigningInfo()?.masterKey()?.unpaddedBase64PublicKey
+            if (deviceOrCrossSigningKeyId == myMSKPKey) {
+                // we have to check if we can trust
+
+                var isSignatureValid = false
+                try {
+                    crossSigningOlm.verifySignature(CrossSigningOlm.KeyType.MASTER, authData.signalableJSONDictionary(), authData.signatures)
+                    isSignatureValid = true
+                } catch (failure: Throwable) {
+                    Timber.w(failure, "getKeysBackupTrust: Bad signature from my user MSK")
+                }
+                val mskTrusted = cryptoStore.getMyCrossSigningInfo()?.masterKey()?.trustLevel?.isVerified() == true
+                if (isSignatureValid && mskTrusted) {
+                    keysBackupVersionTrustIsUsable = true
+                }
+                val signature = KeysBackupVersionTrustSignature.UserSignature(
+                        keyId = deviceOrCrossSigningKeyId,
+                        cryptoCrossSigningKey = cryptoStore.getMyCrossSigningInfo()?.masterKey(),
+                        valid = isSignatureValid
+                )
+
+                keysBackupVersionTrustSignatures.add(signature)
+            } else if (deviceOrCrossSigningKeyId != null) {
+                val device = cryptoStore.getUserDevice(userId, deviceOrCrossSigningKeyId)
                 var isSignatureValid = false
 
                 if (device == null) {
-                    Timber.v("getKeysBackupTrust: Signature from unknown device $deviceId")
+                    Timber.v("getKeysBackupTrust: Signature from unknown device $deviceOrCrossSigningKeyId")
                 } else {
                     val fingerprint = device.fingerprint()
                     if (fingerprint != null) {
@@ -455,8 +486,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                     }
                 }
 
-                val signature = KeysBackupVersionTrustSignature(
-                        deviceId = deviceId,
+                val signature = KeysBackupVersionTrustSignature.DeviceSignature(
+                        deviceId = deviceOrCrossSigningKeyId,
                         device = device,
                         valid = isSignatureValid,
                 )
@@ -516,7 +547,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                     UpdateKeysBackupVersionBody(
                             algorithm = keysBackupVersion.algorithm,
                             authData = newMegolmBackupAuthDataWithNewSignature.toJsonDict(),
-                            version = keysBackupVersion.version)
+                            version = keysBackupVersion.version
+                    )
                 }
 
                 // And send it to the homeserver
@@ -719,14 +751,18 @@ internal class DefaultKeysBackupService @Inject constructor(
                             }
                         }
                     }
-                    Timber.v("restoreKeysWithRecoveryKey: Decrypted ${sessionsData.size} keys out" +
-                            " of $sessionsFromHsCount from the backup store on the homeserver")
+                    Timber.v(
+                            "restoreKeysWithRecoveryKey: Decrypted ${sessionsData.size} keys out" +
+                                    " of $sessionsFromHsCount from the backup store on the homeserver"
+                    )
 
                     // Do not trigger a backup for them if they come from the backup version we are using
                     val backUp = keysVersionResult.version != keysBackupVersion?.version
                     if (backUp) {
-                        Timber.v("restoreKeysWithRecoveryKey: Those keys will be backed up" +
-                                " to backup version: ${keysBackupVersion?.version}")
+                        Timber.v(
+                                "restoreKeysWithRecoveryKey: Those keys will be backed up" +
+                                        " to backup version: ${keysBackupVersion?.version}"
+                        )
                     }
 
                     // Import them into the crypto store
@@ -801,11 +837,15 @@ internal class DefaultKeysBackupService @Inject constructor(
             // Get key for the room and for the session
             val data = getRoomSessionDataTask.execute(GetRoomSessionDataTask.Params(roomId, sessionId, version))
             // Convert to KeysBackupData
-            KeysBackupData(mutableMapOf(
-                    roomId to RoomKeysBackupData(mutableMapOf(
-                            sessionId to data
-                    ))
-            ))
+            KeysBackupData(
+                    mutableMapOf(
+                            roomId to RoomKeysBackupData(
+                                    mutableMapOf(
+                                            sessionId to data
+                                    )
+                            )
+                    )
+            )
         } else if (roomId != null) {
             // Get all keys for the room
             val data = getRoomSessionsDataTask.execute(GetRoomSessionsDataTask.Params(roomId, version))
@@ -1326,7 +1366,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                 "sender_key" to sessionData.senderKey,
                 "sender_claimed_keys" to sessionData.senderClaimedKeys,
                 "forwarding_curve25519_key_chain" to (sessionData.forwardingCurve25519KeyChain.orEmpty()),
-                "session_key" to sessionData.sessionKey)
+                "session_key" to sessionData.sessionKey
+        )
 
         val json = MoshiProvider.providesMoshi()
                 .adapter(Map::class.java)
@@ -1354,7 +1395,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                 sessionData = mapOf(
                         "ciphertext" to encryptedSessionBackupData.mCipherText,
                         "mac" to encryptedSessionBackupData.mMac,
-                        "ephemeral" to encryptedSessionBackupData.mEphemeralKey)
+                        "ephemeral" to encryptedSessionBackupData.mEphemeralKey
+                )
         )
     }
 
