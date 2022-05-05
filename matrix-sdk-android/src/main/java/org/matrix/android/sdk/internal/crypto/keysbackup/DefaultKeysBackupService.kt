@@ -145,17 +145,11 @@ internal class DefaultKeysBackupService @Inject constructor(
 
     private var keysBackupStateListener: KeysBackupStateListener? = null
 
-    override val isEnabled: Boolean
-        get() = keysBackupStateManager.isEnabled
+    override fun isEnabled(): Boolean = keysBackupStateManager.isEnabled
 
-    override val isStucked: Boolean
-        get() = keysBackupStateManager.isStucked
+    override fun isStucked(): Boolean = keysBackupStateManager.isStucked
 
-    override val state: KeysBackupState
-        get() = keysBackupStateManager.state
-
-    override val currentBackupVersion: String?
-        get() = keysBackupVersion?.version
+    override fun getState(): KeysBackupState = keysBackupStateManager.state
 
     override fun addListener(listener: KeysBackupStateListener) {
         keysBackupStateManager.addListener(listener)
@@ -282,7 +276,7 @@ internal class DefaultKeysBackupService @Inject constructor(
                             this.callback = object : MatrixCallback<Unit> {
                                 private fun eventuallyRestartBackup() {
                                     // Do not stay in KeysBackupState.Unknown but check what is available on the homeserver
-                                    if (state == KeysBackupState.Unknown) {
+                                    if (getState() == KeysBackupState.Unknown) {
                                         checkAndStartKeysBackup()
                                     }
                                 }
@@ -371,7 +365,7 @@ internal class DefaultKeysBackupService @Inject constructor(
                                 }
 
                                 // If backup is finished, notify the main listener
-                                if (state === KeysBackupState.ReadyToBackUp) {
+                                if (getState() === KeysBackupState.ReadyToBackUp) {
                                     backupAllGroupSessionsCallback?.onSuccess(Unit)
                                     resetBackupAllGroupSessionsListeners()
                                 }
@@ -516,7 +510,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                     UpdateKeysBackupVersionBody(
                             algorithm = keysBackupVersion.algorithm,
                             authData = newMegolmBackupAuthDataWithNewSignature.toJsonDict(),
-                            version = keysBackupVersion.version)
+                            version = keysBackupVersion.version
+                    )
                 }
 
                 // And send it to the homeserver
@@ -719,14 +714,18 @@ internal class DefaultKeysBackupService @Inject constructor(
                             }
                         }
                     }
-                    Timber.v("restoreKeysWithRecoveryKey: Decrypted ${sessionsData.size} keys out" +
-                            " of $sessionsFromHsCount from the backup store on the homeserver")
+                    Timber.v(
+                            "restoreKeysWithRecoveryKey: Decrypted ${sessionsData.size} keys out" +
+                                    " of $sessionsFromHsCount from the backup store on the homeserver"
+                    )
 
                     // Do not trigger a backup for them if they come from the backup version we are using
                     val backUp = keysVersionResult.version != keysBackupVersion?.version
                     if (backUp) {
-                        Timber.v("restoreKeysWithRecoveryKey: Those keys will be backed up" +
-                                " to backup version: ${keysBackupVersion?.version}")
+                        Timber.v(
+                                "restoreKeysWithRecoveryKey: Those keys will be backed up" +
+                                        " to backup version: ${keysBackupVersion?.version}"
+                        )
                     }
 
                     // Import them into the crypto store
@@ -801,11 +800,15 @@ internal class DefaultKeysBackupService @Inject constructor(
             // Get key for the room and for the session
             val data = getRoomSessionDataTask.execute(GetRoomSessionDataTask.Params(roomId, sessionId, version))
             // Convert to KeysBackupData
-            KeysBackupData(mutableMapOf(
-                    roomId to RoomKeysBackupData(mutableMapOf(
-                            sessionId to data
-                    ))
-            ))
+            KeysBackupData(
+                    mutableMapOf(
+                            roomId to RoomKeysBackupData(
+                                    mutableMapOf(
+                                            sessionId to data
+                                    )
+                            )
+                    )
+            )
         } else if (roomId != null) {
             // Get all keys for the room
             val data = getRoomSessionsDataTask.execute(GetRoomSessionsDataTask.Params(roomId, version))
@@ -842,12 +845,12 @@ internal class DefaultKeysBackupService @Inject constructor(
      */
     fun maybeBackupKeys() {
         when {
-            isStucked                              -> {
+            isStucked()                                 -> {
                 // If not already done, or in error case, check for a valid backup version on the homeserver.
                 // If there is one, maybeBackupKeys will be called again.
                 checkAndStartKeysBackup()
             }
-            state == KeysBackupState.ReadyToBackUp -> {
+            getState() == KeysBackupState.ReadyToBackUp -> {
                 keysBackupStateManager.state = KeysBackupState.WillBackUp
 
                 // Wait between 0 and 10 seconds, to avoid backup requests from
@@ -860,8 +863,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                     uiHandler.post { backupKeys() }
                 }
             }
-            else                                   -> {
-                Timber.v("maybeBackupKeys: Skip it because state: $state")
+            else                                        -> {
+                Timber.v("maybeBackupKeys: Skip it because state: ${getState()}")
             }
         }
     }
@@ -945,9 +948,9 @@ internal class DefaultKeysBackupService @Inject constructor(
     }
 
     override fun checkAndStartKeysBackup() {
-        if (!isStucked) {
+        if (!isStucked()) {
             // Try to start or restart the backup only if it is in unknown or bad state
-            Timber.w("checkAndStartKeysBackup: invalid state: $state")
+            Timber.w("checkAndStartKeysBackup: invalid state: ${getState()}")
 
             return
         }
@@ -1185,7 +1188,7 @@ internal class DefaultKeysBackupService @Inject constructor(
         Timber.v("backupKeys")
 
         // Sanity check, as this method can be called after a delay, the state may have change during the delay
-        if (!isEnabled || backupOlmPkEncryption == null || keysBackupVersion == null) {
+        if (!isEnabled() || backupOlmPkEncryption == null || keysBackupVersion == null) {
             Timber.v("backupKeys: Invalid configuration")
             backupAllGroupSessionsCallback?.onFailure(IllegalStateException("Invalid configuration"))
             resetBackupAllGroupSessionsListeners()
@@ -1193,9 +1196,9 @@ internal class DefaultKeysBackupService @Inject constructor(
             return
         }
 
-        if (state === KeysBackupState.BackingUp) {
+        if (getState() === KeysBackupState.BackingUp) {
             // Do nothing if we are already backing up
-            Timber.v("backupKeys: Invalid state: $state")
+            Timber.v("backupKeys: Invalid state: ${getState()}")
             return
         }
 
@@ -1326,7 +1329,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                 "sender_key" to sessionData.senderKey,
                 "sender_claimed_keys" to sessionData.senderClaimedKeys,
                 "forwarding_curve25519_key_chain" to (sessionData.forwardingCurve25519KeyChain.orEmpty()),
-                "session_key" to sessionData.sessionKey)
+                "session_key" to sessionData.sessionKey
+        )
 
         val json = MoshiProvider.providesMoshi()
                 .adapter(Map::class.java)
@@ -1354,7 +1358,8 @@ internal class DefaultKeysBackupService @Inject constructor(
                 sessionData = mapOf(
                         "ciphertext" to encryptedSessionBackupData.mCipherText,
                         "mac" to encryptedSessionBackupData.mMac,
-                        "ephemeral" to encryptedSessionBackupData.mEphemeralKey)
+                        "ephemeral" to encryptedSessionBackupData.mEphemeralKey
+                )
         )
     }
 
