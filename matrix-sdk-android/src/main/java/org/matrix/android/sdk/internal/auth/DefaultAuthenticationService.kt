@@ -323,8 +323,7 @@ internal class DefaultAuthenticationService @Inject constructor(
                 }
     }
 
-    override val isRegistrationStarted: Boolean
-        get() = currentRegistrationWizard?.isRegistrationStarted == true
+    override fun isRegistrationStarted() = currentRegistrationWizard?.isRegistrationStarted() == true
 
     override fun getLoginWizard(): LoginWizard {
         return currentLoginWizard
@@ -379,9 +378,11 @@ internal class DefaultAuthenticationService @Inject constructor(
             throw MatrixIdFailure.InvalidMatrixId
         }
 
-        return getWellknownTask.execute(GetWellknownTask.Params(
-                domain = matrixId.getDomain(),
-                homeServerConnectionConfig = homeServerConnectionConfig)
+        return getWellknownTask.execute(
+                GetWellknownTask.Params(
+                        domain = matrixId.getDomain(),
+                        homeServerConnectionConfig = homeServerConnectionConfig
+                )
         )
     }
 
@@ -390,13 +391,15 @@ internal class DefaultAuthenticationService @Inject constructor(
                                               password: String,
                                               initialDeviceName: String,
                                               deviceId: String?): Session {
-        return directLoginTask.execute(DirectLoginTask.Params(
-                homeServerConnectionConfig = homeServerConnectionConfig,
-                userId = matrixId,
-                password = password,
-                deviceName = initialDeviceName,
-                deviceId = deviceId
-        ))
+        return directLoginTask.execute(
+                DirectLoginTask.Params(
+                        homeServerConnectionConfig = homeServerConnectionConfig,
+                        userId = matrixId,
+                        password = password,
+                        deviceName = initialDeviceName,
+                        deviceId = deviceId
+                )
+        )
     }
 
     private fun buildAuthAPI(homeServerConnectionConfig: HomeServerConnectionConfig): AuthAPI {
