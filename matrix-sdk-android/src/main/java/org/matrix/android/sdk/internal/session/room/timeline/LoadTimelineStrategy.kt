@@ -16,6 +16,8 @@
 
 package org.matrix.android.sdk.internal.session.room.timeline
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Observer
 import io.realm.OrderedCollectionChangeSet
 import io.realm.OrderedRealmCollectionChangeListener
 import io.realm.Realm
@@ -23,9 +25,15 @@ import io.realm.RealmConfiguration
 import io.realm.RealmResults
 import io.realm.kotlin.createObject
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.failure.Failure
 import org.matrix.android.sdk.api.failure.MatrixError
+import org.matrix.android.sdk.api.query.QueryStringValue
+import org.matrix.android.sdk.api.session.events.model.Event
+import org.matrix.android.sdk.api.session.events.model.EventType
+import org.matrix.android.sdk.api.session.room.model.RoomMemberContent
 import org.matrix.android.sdk.api.session.room.send.SendState
 import org.matrix.android.sdk.api.session.room.timeline.Timeline
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
@@ -40,7 +48,9 @@ import org.matrix.android.sdk.internal.database.model.deleteAndClearThreadEvents
 import org.matrix.android.sdk.internal.database.query.findAllIncludingEvents
 import org.matrix.android.sdk.internal.database.query.findLastForwardChunkOfThread
 import org.matrix.android.sdk.internal.database.query.where
+import org.matrix.android.sdk.internal.session.events.getFixedRoomMemberContent
 import org.matrix.android.sdk.internal.session.room.relation.threads.FetchThreadTimelineTask
+import org.matrix.android.sdk.internal.session.room.state.StateEventDataSource
 import org.matrix.android.sdk.internal.session.sync.handler.room.ThreadsAwarenessHandler
 import org.matrix.android.sdk.internal.util.time.Clock
 import timber.log.Timber
@@ -100,7 +110,8 @@ internal class LoadTimelineStrategy constructor(
             val onEventsUpdated: (Boolean) -> Unit,
             val onEventsDeleted: () -> Unit,
             val onLimitedTimeline: () -> Unit,
-            val onNewTimelineEvents: (List<String>) -> Unit
+            val onNewTimelineEvents: (List<String>) -> Unit,
+            val stateEventDataSource: StateEventDataSource,
     )
 
     private var getContextLatch: CompletableDeferred<Unit>? = null
@@ -165,7 +176,9 @@ internal class LoadTimelineStrategy constructor(
             onEventsUpdated = dependencies.onEventsUpdated
     )
 
-    fun onStart() {
+    private val liveRoomStateListener = LiveRoomStateListener(roomId, dependencies.stateEventDataSource)
+
+    suspend fun onStart() {
         dependencies.eventDecryptor.start()
         dependencies.timelineInput.listeners.add(timelineInputListener)
         val realm = dependencies.realm.get()
@@ -174,9 +187,13 @@ internal class LoadTimelineStrategy constructor(
             it.addChangeListener(chunkEntityListener)
             timelineChunk = it.createTimelineChunk()
         }
+
+        if (dependencies.timelineSettings.useLiveSenderInfo) {
+            liveRoomStateListener.start()
+        }
     }
 
-    fun onStop() {
+    suspend fun onStop() {
         dependencies.eventDecryptor.destroy()
         dependencies.timelineInput.listeners.remove(timelineInputListener)
         chunkEntity?.removeChangeListener(chunkEntityListener)
@@ -187,6 +204,9 @@ internal class LoadTimelineStrategy constructor(
         timelineChunk = null
         if (mode is Mode.Thread) {
             clearThreadChunkEntity(dependencies.realm.get(), mode.rootThreadEventId)
+        }
+        if (dependencies.timelineSettings.useLiveSenderInfo) {
+            liveRoomStateListener.stop()
         }
     }
 
@@ -222,7 +242,22 @@ internal class LoadTimelineStrategy constructor(
     }
 
     fun buildSnapshot(): List<TimelineEvent> {
-        return buildSendingEvents() + timelineChunk?.builtItems(includesNext = true, includesPrev = true).orEmpty()
+        val events = buildSendingEvents() + timelineChunk?.builtItems(includesNext = true, includesPrev = true).orEmpty()
+        return if (dependencies.timelineSettings.useLiveSenderInfo) {
+            events.map(this::applyLiveRoomState)
+        } else {
+            events
+        }
+    }
+
+    private fun applyLiveRoomState(event: TimelineEvent): TimelineEvent {
+        val updatedState = liveRoomStateListener.getLiveState(event.senderInfo.userId)
+        return if (updatedState != null) {
+            val updatedSenderInfo = event.senderInfo.copy(avatarUrl = updatedState.avatarUrl, displayName = updatedState.displayName)
+            event.copy(senderInfo = updatedSenderInfo)
+        } else {
+            event
+        }
     }
 
     private fun buildSendingEvents(): List<TimelineEvent> {
@@ -311,4 +346,42 @@ internal class LoadTimelineStrategy constructor(
             )
         }
     }
+}
+
+/**
+ * Helper to observe and query the live room state.
+ */
+private class LiveRoomStateListener(
+        roomId: String,
+        stateEventDataSource: StateEventDataSource,
+) {
+    private val roomStateObserver = Observer<List<Event>> { stateEvents ->
+        stateEvents.map { event ->
+            val memberContent = event.getFixedRoomMemberContent() ?: return@map
+            val stateKey = event.stateKey ?: return@map
+            liveRoomState[stateKey] = memberContent
+        }
+    }
+    private val stateEventsLiveData: LiveData<List<Event>> by lazy {
+        stateEventDataSource.getStateEventsLive(
+                roomId,
+                setOf(EventType.STATE_ROOM_MEMBER),
+                QueryStringValue.NoCondition
+        )
+    }
+
+    private val liveRoomState = mutableMapOf<String, RoomMemberContent>()
+
+    suspend fun start() = withContext(Dispatchers.Main) {
+        stateEventsLiveData.observeForever(roomStateObserver)
+    }
+
+    suspend fun stop() = withContext(Dispatchers.Main) {
+        if (stateEventsLiveData.hasActiveObservers()) {
+            stateEventsLiveData.removeObserver(roomStateObserver)
+        }
+    }
+
+    fun getLiveState(stateKey: String): RoomMemberContent? = liveRoomState[stateKey]
+
 }

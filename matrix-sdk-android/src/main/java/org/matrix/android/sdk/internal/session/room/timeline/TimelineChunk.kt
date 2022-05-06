@@ -137,30 +137,7 @@ internal class TimelineChunk(
             deepBuiltItems.addAll(prevEvents)
         }
 
-        return if (timelineSettings.useLiveSenderInfo) {
-            updateToLiveSenderData(deepBuiltItems)
-        } else {
-            deepBuiltItems
-        }
-    }
-
-    private fun updateToLiveSenderData(deepBuiltItems: List<TimelineEvent>): List<TimelineEvent> {
-        // group room users events that are m.room.member and which have a prevContent.
-        // those two conditions filter the list to extract events where related action is a profile info update.
-        // if it true we group these events by userId (User can change many times his info profiles) and we extract the last changes
-        // that was made
-        val isProfileInfoChangeEvent: (TimelineEvent) -> Boolean = { it.root.type == EventType.STATE_ROOM_MEMBER && it.root.prevContent != null }
-        val usersByIds = deepBuiltItems.filter(isProfileInfoChangeEvent)
-                .groupBy { it.senderInfo.userId }
-
-        return deepBuiltItems.map { event ->
-            val updatedSenderInfo = event.root.senderId?.let { usersByIds[it] }?.firstOrNull()?.senderInfo
-            if (updatedSenderInfo != null) {
-                event.copy(senderInfo = updatedSenderInfo)
-            } else {
-                event
-            }
-        }
+        return deepBuiltItems
     }
 
     /**
