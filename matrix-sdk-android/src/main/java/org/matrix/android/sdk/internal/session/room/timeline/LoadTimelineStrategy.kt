@@ -383,5 +383,4 @@ private class LiveRoomStateListener(
     }
 
     fun getLiveState(stateKey: String): RoomMemberContent? = liveRoomState[stateKey]
-
 }
