@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <!--<im.vector.app.core.preference.VectorPreferenceCategory-->
     <!--android:key="SETTINGS_LABS_PREFERENCE_KEY"-->
@@ -69,7 +70,8 @@
         android:title="@string/labs_render_locations_in_timeline" />
 
     <im.vector.app.core.preference.VectorSwitchPreference
-        android:defaultValue="false"
+        android:defaultValue="@bool/settings_labs_use_live_sender_info_default"
+        app:isPreferenceVisible="@bool/settings_labs_use_live_sender_info_visible"
         android:key="SETTINGS_LABS_IS_LIVE_SENDER_INFO"
         android:summary="@string/labs_show_latest_profile_description"
         android:title="@string/labs_show_latest_profile" />

@@ -16,8 +16,6 @@
 
 package org.matrix.android.sdk.internal.session.room.timeline
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.Observer
 import io.realm.OrderedCollectionChangeSet
 import io.realm.OrderedRealmCollectionChangeListener
 import io.realm.Realm
@@ -25,15 +23,9 @@ import io.realm.RealmConfiguration
 import io.realm.RealmResults
 import io.realm.kotlin.createObject
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.matrix.android.sdk.api.extensions.orFalse
 import org.matrix.android.sdk.api.failure.Failure
 import org.matrix.android.sdk.api.failure.MatrixError
-import org.matrix.android.sdk.api.query.QueryStringValue
-import org.matrix.android.sdk.api.session.events.model.Event
-import org.matrix.android.sdk.api.session.events.model.EventType
-import org.matrix.android.sdk.api.session.room.model.RoomMemberContent
 import org.matrix.android.sdk.api.session.room.send.SendState
 import org.matrix.android.sdk.api.session.room.timeline.Timeline
 import org.matrix.android.sdk.api.session.room.timeline.TimelineEvent
@@ -48,7 +40,6 @@ import org.matrix.android.sdk.internal.database.model.deleteAndClearThreadEvents
 import org.matrix.android.sdk.internal.database.query.findAllIncludingEvents
 import org.matrix.android.sdk.internal.database.query.findLastForwardChunkOfThread
 import org.matrix.android.sdk.internal.database.query.where
-import org.matrix.android.sdk.internal.session.events.getFixedRoomMemberContent
 import org.matrix.android.sdk.internal.session.room.relation.threads.FetchThreadTimelineTask
 import org.matrix.android.sdk.internal.session.room.state.StateEventDataSource
 import org.matrix.android.sdk.internal.session.sync.handler.room.ThreadsAwarenessHandler
@@ -346,41 +337,4 @@ internal class LoadTimelineStrategy constructor(
             )
         }
     }
-}
-
-/**
- * Helper to observe and query the live room state.
- */
-private class LiveRoomStateListener(
-        roomId: String,
-        stateEventDataSource: StateEventDataSource,
-) {
-    private val roomStateObserver = Observer<List<Event>> { stateEvents ->
-        stateEvents.map { event ->
-            val memberContent = event.getFixedRoomMemberContent() ?: return@map
-            val stateKey = event.stateKey ?: return@map
-            liveRoomState[stateKey] = memberContent
-        }
-    }
-    private val stateEventsLiveData: LiveData<List<Event>> by lazy {
-        stateEventDataSource.getStateEventsLive(
-                roomId,
-                setOf(EventType.STATE_ROOM_MEMBER),
-                QueryStringValue.NoCondition
-        )
-    }
-
-    private val liveRoomState = mutableMapOf<String, RoomMemberContent>()
-
-    suspend fun start() = withContext(Dispatchers.Main) {
-        stateEventsLiveData.observeForever(roomStateObserver)
-    }
-
-    suspend fun stop() = withContext(Dispatchers.Main) {
-        if (stateEventsLiveData.hasActiveObservers()) {
-            stateEventsLiveData.removeObserver(roomStateObserver)
-        }
-    }
-
-    fun getLiveState(stateKey: String): RoomMemberContent? = liveRoomState[stateKey]
 }
